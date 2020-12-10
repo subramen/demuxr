@@ -1,0 +1,7 @@
+logs*
+*.mp3
+*.vscode*
+.gitattributes
+*.mar
+TEMP*
+*.pt
