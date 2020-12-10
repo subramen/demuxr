@@ -19,8 +19,8 @@ class DemucsHandler(BaseHandler):
     def __init__(self):
         self.model = None
         self.initialized = False
-        self.tempdir = Path("tmp")
-        self.tempdir.mkdir(exist_ok=True)
+        self.filedir = Path("filedir")
+        self.filedir.mkdir(exist_ok=True)
 
 
     def initialize(self, ctx):
@@ -58,7 +58,7 @@ class DemucsHandler(BaseHandler):
         print("[SURAJ] Model initialized!")
 
     # From https://github.com/facebookresearch/demucs/blob/dd7a77a0b2600d24168bbe7a40ef67f195586b62/demucs/separate.py#L199
-    def preprocess(self, data):
+    def preprocess(self, data, track_folder):
         """
         Transform raw input into model input data.
         track: audio file
@@ -66,14 +66,9 @@ class DemucsHandler(BaseHandler):
         """
         inp = data[0]
         audio = inp.get('file')
-        track_id = inp.get('id').decode()
-
-        print(f"[SURAJ] ID: {track_id}, file[:10]: {audio[:10]}")
-        print(f"[SURAJ] audio[:10]: {audio[:10]}")
-        print(f"[SURAJ] audio[10:]: {audio[10:]}")
         print(f"[SURAJ] len(audio): {len(audio)}")
 
-        track_path = self.tempdir / (track_id + '.mp3')
+        track_path = track_folder / 'input.mp3'
         with open(track_path, 'wb') as f:
             print(f"[SURAJ] saving to track_path: {track_path}")
             f.write(audio)
@@ -84,7 +79,7 @@ class DemucsHandler(BaseHandler):
         ref = wav.mean(0)
         wav = (wav - ref.mean()) / ref.std()
         print(f"[SURAJ] Audio track preprocessed. Shape of tensor: {wav.size()}")
-        return track_id, wav
+        return wav
 
 
     def inference(self, wav: torch.Tensor) -> torch.Tensor:
@@ -97,10 +92,8 @@ class DemucsHandler(BaseHandler):
 
 
     # From https://github.com/facebookresearch/demucs/blob/dd7a77a0b2600d24168bbe7a40ef67f195586b62/demucs/separate.py#L207
-    def postprocess(self, inference_output: torch.Tensor, track_id:str) -> Path:
+    def postprocess(self, inference_output, track_folder) -> Path:
         print("[SURAJ] starting postprocess")
-        track_folder = self.tempdir / Path("separated") / track_id
-        track_folder.mkdir(parents=True, exist_ok=True)
 
         out_msg = bytearray()
         source_names = ["drums", "bass", "other", "vocals"]
@@ -113,9 +106,12 @@ class DemucsHandler(BaseHandler):
         return [out_msg]
 
     def handle(self, data, context):
-        track_id, wav = self.preprocess(data)
+        track_folder = self.filedir / str(uuid.uuid4())
+        track_folder.mkdir(parents=True)
+
+        wav = self.preprocess(data, track_folder)
         stems = self.inference(wav)
-        return self.postprocess(stems, track_id)
+        return self.postprocess(stems, track_folder)
 
 
 
