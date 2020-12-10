@@ -31,8 +31,8 @@ def encode_mp3(wav, path, verbose=False):
         encoder.silence()
     mp3_data = encoder.encode(wav.tostring())
     mp3_data += encoder.flush()
-    with open(path, "wb") as f:
-        f.write(mp3_data)
+    # with open(path, "wb") as f:
+    #     f.write(mp3_data)
     return mp3_data
 
 

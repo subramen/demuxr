@@ -5,3 +5,6 @@ logs*
 *.mar
 TEMP*
 *.pt
+cli.txt
+resp.txt
+*.json

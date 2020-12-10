@@ -102,15 +102,15 @@ class DemucsHandler(BaseHandler):
         track_folder = self.tempdir / Path("separated") / track_id
         track_folder.mkdir(parents=True, exist_ok=True)
 
-        out_dict = {}
+        out_msg = bytearray()
         source_names = ["drums", "bass", "other", "vocals"]
         for source, name in zip(inference_output, source_names):
             source = (source * 2**15).clamp_(-2**15, 2**15 - 1).short()
             source = source.transpose(0,1).numpy()
-            encode_mp3(source, str(track_folder / name) + ".mp3")
+            out_msg += encode_mp3(source, str(track_folder / name) + ".mp3")
 
-        print(f"[SURAJ] Files saved at {track_folder}")
-        return ['done']
+        print(f"[SURAJ] Bytearray length: {len(out_msg)}")
+        return [out_msg]
 
     def handle(self, data, context):
         track_id, wav = self.preprocess(data)
