@@ -9,6 +9,7 @@ import numpy as np
 
 app = Flask(__name__)
 
+
 @app.route("/", methods=['GET', 'POST'])
 def hello():
     """
@@ -58,13 +59,16 @@ def http_request(mp3_file, mp3_id):
     print(f"Starting http for mp3_path: {start}")
 
     URL = "http://127.0.0.1:8080/predictions/demucs_state/1"
-    payload = {'mp3_file': (None, open(mp3_file, 'rb'), ''), 'mp3_id':mp3_id}
-    response = requests.post(URL, files=payload)
+    # payload = {'mp3_file': ('track', open(mp3_file, 'rb'))}# 'mp3_id':mp3_id}
+
+    with open('test.mp3', 'rb') as f:
+        data = f.read()
+    response = requests.post(url='http://httpbin.org/post', data=data, headers={'Content-Type': 'audio/mpeg'})
 
     print(f"http took {time.time()-start}s")
     print(response.status_code)
     if response.status_code == 200:
-        return json.loads(response.content)
+        return response
     else:
         sys.exit()
 
