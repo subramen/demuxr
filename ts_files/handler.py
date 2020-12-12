@@ -65,8 +65,10 @@ class DemucsHandler(BaseHandler):
         :return: tensor of normalized audio
         """
         inp = data[0]
-        audio = inp.get('file')
+        audio = inp.get('data') or inp.get('body')
+
         print(f"[SURAJ] len(audio): {len(audio)}")
+        print(f"[SURAJ]  {audio[:100]}")
 
         track_path = track_folder / 'input.mp3'
         with open(track_path, 'wb') as f:
