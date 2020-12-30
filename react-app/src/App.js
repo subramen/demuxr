@@ -1,16 +1,14 @@
-import React, { Component, useState } from 'react'
-import {RecoilRoot, atom, useRecoilState, useRecoilValue } from 'recoil';
+import React, { useState } from 'react'
 import ReactPlayer from 'react-player'
 
-const version = 1;
 const API_BASE_URL = 'http://localhost:5000/api/'
+const FILE_SERVER = 'http://localhost:8000/'
 
 function App() {
   const [url, setURL] = useState('');
   const [urlID, setURLID] = useState('');
   const [eta, setETA] = useState(-1);
   const [filedir, setFiledir] = useState('');
-
 
   function getURLInfo(url) {
     setURL(url);
@@ -25,9 +23,6 @@ function App() {
       console.log(url, urlID, eta, filedir)
   }
 
-  function EtaDisplay() {
-    return <div> ETA: {eta} </div>
-  }
 
   function runInference() {
     console.log('running inference for url', url);
@@ -35,18 +30,31 @@ function App() {
     const response = fetch(infer_api_str)
       .then(res => res.json())
       .then(data => setFiledir(data['message']))
-      console.log(response)
+      .catch(error => console.error(error));
+    console.log(response)
     console.log('filedir: ', filedir)
   }
 
 
+  function EtaDisplay() {
+    if (eta > 0) {
+      return (
+        <div className='eta'>
+          <div className='eta-display'> ETA: {eta} </div>
+          <button onClick={runInference}> Run inference </button>
+        </div>
+      )
+    }
+    return <div className='eta' />
+  }
+
+
   return (
-    <RecoilRoot>
+    <div className='app'>
       <Form getURLInfo={getURLInfo} />
       <EtaDisplay />
-      <button onClick={runInference}> Run inference </button>
       <Player filedir={filedir} />
-    </RecoilRoot>
+    </div>
   );
 }
 
@@ -69,7 +77,7 @@ function Form(props) {
         Youtube URL
         <input type='text' name='input-url' onChange={handleChange} />
       </label>
-      <input type='submit' value="Go!" />
+      <input type='submit' value="Get ETA!" />
     </form>
   )
 }
@@ -103,30 +111,38 @@ function Player(props) {
 function Stem(props) {
   const {filedir, stem, playing} = props;
   const [muted, setMute] = useState(false);
-  const url = 'http://localhost:8000/' + filedir + '/' + stem + '.mp3';
+  const [volume, setVolume] = useState(0.8);
+  const url = FILE_SERVER + filedir + '/' + stem + '.mp3';
 
   const toggleStem = () => {
     console.log('toggling ', stem, 'from ', muted, 'to ', !muted);
     setMute(!muted); };
+
+  const handleVolumeChange = e => {
+    setVolume(parseFloat(e.target.value))
+  }
 
   return (
     <div className={'stem-group-' + stem}>
       <button className={'stem-button-' + stem} onClick={toggleStem}> {stem} </button>
 
       <ReactPlayer
-      className={'stem-track-' + stem}
-      width='0px'
-      height='1px'
-      url={url}
-      playing={playing}
-      muted={muted}
-      onReady={() => console.log('bassReady')}
-      onStart={() => console.log('bassStart')}
-      onPause={() => console.log('bassPause')}
-      onBuffer={() => console.log('onBuffer')}
-      onSeek={e => console.log('onSeek', e)}
-      onError={e => console.log('onError', e)}
+        className={'stem-track-' + stem}
+        width='0px'
+        height='1px'
+        url={url}
+        playing={playing}
+        muted={muted}
+        volume={volume}
+        onReady={() => console.log(stem,'Ready')}
+        onStart={() => console.log(stem, 'Start')}
+        onPause={() => console.log(stem, 'Pause')}
+        onBuffer={() => console.log(stem, 'onBuffer')}
+        onSeek={e => console.log('onSeek', e)}
+        onError={e => console.log('onError', e)}
       />
+
+      <input className='volume-slider' type='range' min={0} max={1} step='any' value={volume} onChange={handleVolumeChange} />
     </div>
   );
 }

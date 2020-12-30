@@ -79,11 +79,11 @@ def main():
             save to cache
             return to user
     """
-    MAX_DURATION = 260
+    MAX_DURATION = 6500
     resp = {'status': None, 'message': None}
 
     url = request.args.get('url')
-    info_dict = get_youtube_audio(url)
+    info_dict = get_youtube_audio(url, False)
     savedir = Path('files') / info_dict['id']
     eta = info_dict['duration']
 
@@ -93,7 +93,11 @@ def main():
         resp['message'] = "Video is too long!"
     else:
         logger.info(f"ETA for demuxing: {eta/60} minutes")
-        run_inference(savedir)
+
+        if not savedir.exists():  # cache hit
+            get_youtube_audio(url)
+            run_inference(savedir)
+            logger.info(f"Inference done for {info_dict['id']}!")
         resp['status'] = "Done!"
         resp['message'] = str(savedir)
 
