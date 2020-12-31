@@ -14,6 +14,16 @@ app = Flask(__name__)
 cors = CORS(app)
 
 
+# get ETA
+
+# get the audio
+
+# start torchserve
+
+# get the stems
+
+
+
 def get_youtube_audio(url, download=True):
     logger.debug(f"Downloading mp3 from {url}")
     ydl_opts = {

@@ -1,38 +1,40 @@
 import React, { useState } from 'react'
-import ReactPlayer from 'react-player'
+import ReactPlayer from 'react-player/file'
 
 const API_BASE_URL = 'http://localhost:5000/api/'
 const FILE_SERVER = 'http://localhost:8000/'
 
 function App() {
   const [url, setURL] = useState('');
-  const [urlID, setURLID] = useState('');
+  const [urlID, setURLID] = useState({});
   const [eta, setETA] = useState(-1);
-  const [filedir, setFiledir] = useState('');
+  const [tooLong, setTooLong] = useState(0);
+  const [inferMsg, setInferMsg] = useState((0, ''));
 
   function getURLInfo(url) {
     setURL(url);
     var info_api_str = API_BASE_URL+ "info?url=" + url;
     fetch(info_api_str)
       .then(response => response.json())
-      .then(function(data) {
+      .then(data => {
         setURLID(data['id']);
         setETA(data['eta']);
+        setTooLong(data['too_long']);
       })
       .catch(error => console.error(error));
-      console.log(url, urlID, eta, filedir)
+      console.log(url, urlID, eta)
   }
 
 
   function runInference() {
     console.log('running inference for url', url);
     var infer_api_str = API_BASE_URL + "demux?url=" + url;
+
     const response = fetch(infer_api_str)
       .then(res => res.json())
-      .then(data => setFiledir(data['message']))
+      .then(data => setInferMsg([data['status'], data['msg']]))
       .catch(error => console.error(error));
-    console.log(response)
-    console.log('filedir: ', filedir)
+    console.log(response);
   }
 
 
@@ -53,16 +55,16 @@ function App() {
     <div className='app'>
       <Form getURLInfo={getURLInfo} />
       <EtaDisplay />
-      <Player filedir={filedir} />
+      <Player folder={inferMsg[1]} />
     </div>
   );
 }
 
 
-
 function Form(props) {
   const getURLInfo = props.getURLInfo;
   const [userInput, setUserInput] = useState('');
+
 
   const handleChange = (e) => { setUserInput(e.target.value); };
 
@@ -83,23 +85,21 @@ function Form(props) {
 }
 
 
-
-
 function Player(props) {
-  const filedir = props.filedir;
+  const stems = ['original', 'bass', 'drums', 'other', 'vocals']
+
+  const folder = props.folder;
   const [playing, setPlaying] = useState(false)
+  const [stemsReady, setStemsReady] = useState(0)
+
   const handlePlayPause = () => {
-    if (filedir !== '') {
+    if (folder !== '') {
       setPlaying(!playing);
     }};
 
   return (
     <div className='player'>
-      <Stem filedir={filedir} playing={playing} stem='original' />
-      <Stem filedir={filedir} playing={playing} stem='bass' />
-      <Stem filedir={filedir} playing={playing} stem='drums' />
-      <Stem filedir={filedir} playing={playing} stem='other' />
-      <Stem filedir={filedir} playing={playing} stem='vocals' />
+      {stems.map(stem => <Stem folder={folder} playing={playing} stem={stem} onReady={() => setStemsReady(stemsReady + 1))}/>)}
       <br/>
       <br/>
       <button onClick={handlePlayPause}> Play/Pause </button>
@@ -109,10 +109,10 @@ function Player(props) {
 
 
 function Stem(props) {
-  const {filedir, stem, playing} = props;
+  const {folder, stem, playing, onReady} = props;
   const [muted, setMute] = useState(false);
   const [volume, setVolume] = useState(0.8);
-  const url = FILE_SERVER + filedir + '/' + stem + '.mp3';
+  const url = folder + '/' + stem + '.mp3';
 
   const toggleStem = () => {
     console.log('toggling ', stem, 'from ', muted, 'to ', !muted);
@@ -134,7 +134,7 @@ function Stem(props) {
         playing={playing}
         muted={muted}
         volume={volume}
-        onReady={() => console.log(stem,'Ready')}
+        onReady={onReady}
         onStart={() => console.log(stem, 'Start')}
         onPause={() => console.log(stem, 'Pause')}
         onBuffer={() => console.log(stem, 'onBuffer')}
@@ -146,5 +146,8 @@ function Stem(props) {
     </div>
   );
 }
+
+
+
 
 export default App;
