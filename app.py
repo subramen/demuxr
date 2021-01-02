@@ -1,79 +1,24 @@
-from flask import Flask, render_template, make_response, request
-from flask_cors import CORS, cross_origin
+from flask import Flask, request
 import requests
+from flask_cors import CORS, cross_origin
 import youtube_dl
-import time
-import sys
 from pathlib import Path
-import json
-import numpy as np
+import tempfile
 from botocore.exceptions import ClientError
 from loguru import logger
+import boto3
+import io
 
 app = Flask(__name__)
 cors = CORS(app)
-model_url = "http://127.0.0.1:8080/predictions/demucs_state/1"
+torchserve_url = "http://127.0.0.1:8080/"
+pred_endpoint = "predictions/demucs_state/1"
 MAX_AUDIO_DURATION = 6500
-
-
-
-# get ETA + other things
-def get_video_info(url):
-    info_dict = youtubedl(url, False)
-    response = {
-        'url': url,
-        'id': info_dict['id'],
-        'eta': info_dict['duration'],
-        'too_long': int(eta > MAX_AUDIO_DURATION)
-    }
-    return response
-
-
-# get the youtube audio in bytes
-def youtubedl(url, download=True):
-    logger.debug(f"Running youtube-dl for {url}")
-    temp = tempfile.TemporaryDirectory()
-    ydl_opts = {
-        'quiet':True,
-        'outtmpl':f'{temp}/%(id)s/original.%(ext)s',
-        'format': 'bestaudio/best',
-        'postprocessors': [{
-            'key': 'FFmpegExtractAudio',
-            'preferredcodec': 'mp3',
-            'preferredquality': '192',}]
-        }
-    mp3_bytes = None
-    with youtube_dl.YoutubeDL(ydl_opts) as ydl:
-        info_dict = ydl.extract_info(url, download=download)
-        if download:
-            out_file = Path(temp) / info_dict['id'] / 'original.mp3'
-            info_dict['mp3_bytes'] = open(out_file, 'rb').read()
-    return info_dict
-
-
-# check if torchserve model is up
-
-
-# get the stems in bytes
-def run_inference(mp3_bytes):
-    response = requests.post(url=model_url, data=mp3_bytes, headers={'Content-Type': 'audio/mpeg'})
-    if response.status_code != 200:
-        logger.error(f"HTTP failed with {response.status_code} | {response.text}")
-        sys.exit()
-    else:
-        logger.debug("Inference done! Saving...")
-        bytebuf = response.content
-        n = len(bytebuf)//4
-        stems = [bytebuf[i:i+n] for i in range(0, len(bytebuf), n)]
-        source_names = ["drums", "bass", "other", "vocals"]
-        stem_bytes = dict(zip(source_names, stems))
-        return stem_bytes
 
 
 class S3Helper:
     def __init__(self, folder):
         self.folder = folder
-        self.s3_client = boto3.client('s3')
         self.access_point = S3Helper.get_url() + folder
 
     # to do - put this in config
@@ -86,10 +31,12 @@ class S3Helper:
         return 'jammates-audio'
 
     # ls grep s3
+    @staticmethod
     def _file_in_cache(self, object_name):
+        s3_client = boto3.client('s3')
         try:
-            r = self.s3_client.head_object(
-                Bucket=self.S3_BUCKET,
+            r = s3_client.head_object(
+                Bucket=S3Helper.get_bucket(),
                 Key=object_name)
         except ClientError:
             logger.debug(f"{object_name} doesn't exist in S3 cache")
@@ -97,21 +44,22 @@ class S3Helper:
         return True
 
     # upload to s3
-    def _upload_file(self, bytes_like, object_name):
+    @staticmethod
+    def _upload_file(bytes_like, object_name):
+        s3_client = boto3.client('s3')
         logger.debug(f'Uploading {object_name}')
-        try:
-            self.s3_client.upload_fileobj(
-                io.BytesIO(blob),
-                self.S3_BUCKET,
-                object_name,
-                ExtraArgs={'ACL':'public-read'}})
+        s3_client.upload_fileobj(
+            io.BytesIO(bytes_like),
+            S3Helper.get_bucket(),
+            object_name,
+            ExtraArgs={'ACL':'public-read'})
         return True
 
-    def cache_available():
+    def cache_available(self):
         return self._file_in_cache(self.folder + '/' + 'vocals.mp3')
 
     @logger.catch
-    def upload_stems(stem_bytes):
+    def upload_stems(self, stem_bytes):
         for name, byt in stem_bytes.items():
             obj_name = self.folder + '/' + name + '.mp3'
             self._upload_file(byt, obj_name)
@@ -139,6 +87,68 @@ class S3Helper:
     #     return stems_bytes
 
 
+# get ETA + other things
+def get_video_info(url):
+    info_dict = youtubedl(url, False)
+    response = {
+        'url': url,
+        'id': info_dict['id'],
+        'eta': info_dict['duration'],
+        'too_long': int(info_dict['duration'] > MAX_AUDIO_DURATION)
+    }
+    return response
+
+
+# get the youtube audio in bytes
+def youtubedl(url, download=True):
+    logger.debug(f"Running youtube-dl for {url}")
+    temp = tempfile.TemporaryDirectory()
+    ydl_opts = {
+        'quiet':True,
+        'outtmpl':f'{temp.name}/%(id)s/original.%(ext)s',
+        'format': 'bestaudio/best',
+        'postprocessors': [{
+            'key': 'FFmpegExtractAudio',
+            'preferredcodec': 'mp3',
+            'preferredquality': '192',}]
+        }
+    mp3_bytes = None
+    with youtube_dl.YoutubeDL(ydl_opts) as ydl:
+        info_dict = ydl.extract_info(url, download=download)
+        if download:
+            out_file = Path(temp.name) / info_dict['id'] / 'original.mp3'
+            info_dict['mp3_bytes'] = open(out_file, 'rb').read()
+    return info_dict
+
+
+# check if torchserve is up
+def ping_torchserve():
+    response = requests.get(torchserve_url+'ping')
+    if response['health']=='healthy!':
+        return True
+    return False
+
+
+# get the stems in bytes
+@logger.catch
+def run_inference(mp3_bytes):
+    logger.info(f"Initializing inference for mp3 of {len(mp3_bytes)}")
+    pred_url = torchserve_url + pred_endpoint
+    response = requests.post(url=pred_url, data=mp3_bytes, headers={'Content-Type': 'audio/mpeg'})
+
+    if response.status_code != 200:
+        logger.error(f"HTTP failed with {response.status_code} | {response.text}")
+        raise RuntimeError("Torchserve inference failed!")
+    else:
+        logger.debug("Inference done! Saving...")
+        bytebuf = response.content
+        n = len(bytebuf)//4
+        stems = [bytebuf[i:i+n] for i in range(0, len(bytebuf), n)]
+        source_names = ["drums", "bass", "other", "vocals"]
+        stem_bytes = dict(zip(source_names, stems))
+        stem_bytes['original'] = mp3_bytes
+        return stem_bytes
+
 
 def validate_url(url):
     info = get_video_info(url)
@@ -152,25 +162,34 @@ def validate_url(url):
 @cross_origin()
 def info():
     url = request.args.get('url')
+    logger.info(f'Pinging /api/info with param = {url}')
     return get_video_info(url)
 
 
-@app.route("/api/demux")
+# @app.route("/api/demux")
 @cross_origin()
 def main():
     response = {'msg': '', 'status': ''}
     url = request.args.get('url')
+    logger.info(f'Pinging /api/demux with param = {url}')
 
     is_valid, status = validate_url(url)
     if not is_valid:
         response['status'], response['msg'] = status
+        logger.error("Video is invalid!", response)
         return response
 
     info_dict = youtubedl(url)
     s3 = S3Helper(info_dict['id'])
+    logger.info(f"Initialized S3 helper for {info_dict['id']}. Checking cache...")
     if not s3.cache_available():
+        logger.info("Not in cache. Running inference...")
         stem_bytes = run_inference(info_dict['mp3_bytes'])
-        upload_stems(stem_bytes)
+        logger.info("Inference done. Caching results...")
+        upload_success = s3.upload_stems(stem_bytes)
+        logger.info(f"Upload to cache success: {upload_success}")
+
+    logger.info(f'Returning stems at {s3.access_point}')
     response['status'] = 200
     response['msg'] = s3.access_point
 

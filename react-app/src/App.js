@@ -2,14 +2,15 @@ import React, { useState } from 'react'
 import ReactPlayer from 'react-player/file'
 
 const API_BASE_URL = 'http://localhost:5000/api/'
-const FILE_SERVER = 'http://localhost:8000/'
+// const FILE_SERVER = 'http://localhost:8000/'
 
 function App() {
   const [url, setURL] = useState('');
   const [urlID, setURLID] = useState({});
   const [eta, setETA] = useState(-1);
   const [tooLong, setTooLong] = useState(0);
-  const [inferMsg, setInferMsg] = useState((0, ''));
+  const [inferHTTP, setInferHTTP] = useState(0);
+  const [inferMsg, setInferMsg] = useState('');
 
   function getURLInfo(url) {
     setURL(url);
@@ -32,7 +33,12 @@ function App() {
 
     const response = fetch(infer_api_str)
       .then(res => res.json())
-      .then(data => setInferMsg([data['status'], data['msg']]))
+      .then(data => {
+        setInferMsg(data['msg']);
+        console.log("inferMsg: ", inferMsg);
+        setInferHTTP(data['status']);
+        console.log("inferHTTP: ", inferHTTP);})
+      .then(() => console.log("response is", inferMsg))
       .catch(error => console.error(error));
     console.log(response);
   }
@@ -55,7 +61,7 @@ function App() {
     <div className='app'>
       <Form getURLInfo={getURLInfo} />
       <EtaDisplay />
-      <Player folder={inferMsg[1]} />
+      <Player folder={inferMsg} />
     </div>
   );
 }
@@ -99,7 +105,7 @@ function Player(props) {
 
   return (
     <div className='player'>
-      {stems.map(stem => <Stem folder={folder} playing={playing} stem={stem} onReady={() => setStemsReady(stemsReady + 1))}/>)}
+      {stems.map(stem => <Stem folder={folder} playing={playing} stem={stem} onReady={() => setStemsReady(stemsReady + 1)}/>)}
       <br/>
       <br/>
       <button onClick={handlePlayPause}> Play/Pause </button>
