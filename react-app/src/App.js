@@ -119,7 +119,7 @@ function Player(props) {
         {stems.map(stem => <Stem folder={folder} playing={playing} stem={stem} onReady={() => setStemsReady(stemsReady + 1)}/>)}
       </div>
       <div className='play-btn'>
-        <PlayPauseButton onClick={handlePlayPause} playing={playing} style={{justifyContent: 'center'}} > Play/Pause </PlayPauseButton>
+        <PlayPauseButton onClick={handlePlayPause} playing={playing} > Play/Pause </PlayPauseButton>
       </div>
     </div>
   )
