@@ -68,19 +68,17 @@ function App() {
   }
 
 
-
-
   return (
     <div className='App'>
-      {/* <Form getURLInfo={getURLInfo} /> */}
-      <EtaDisplay />
+      <UserInput getURLInfo={getURLInfo} />
+      {/* <EtaDisplay /> */}
       <Player folder={inferMsg} />
     </div>
   );
 }
 
 
-function Form(props) {
+function UserInput(props) {
   const getURLInfo = props.getURLInfo;
   const [userInput, setUserInput] = useState('');
   const handleChange = (e) => { setUserInput(e.target.value); };
@@ -90,13 +88,13 @@ function Form(props) {
   };
 
   return (
-    <>
-      <div id='heading1'>Ready to play?</div>
+    <div class="user-input">
+      <Typography variant="h1" align="left">Ready to play?</Typography>
       <div class="wrap">
-        <input type="text" class="searchTerm" placeholder="Paste URL here" />
+        <input type="text" class="search-bar" placeholder="Paste URL here" />
         <Button className="button" mt="25px" px="45px" variant="contained" color="primary">Go</Button>
       </div>
-    </>
+    </div>
   )
 }
 
@@ -113,6 +111,67 @@ function Player(props) {
       setPlaying(!playing);
     }};
 
+  function Stem(props) {
+    const {folder, stem, playing, onReady} = props;
+    const [muted, setMute] = useState(false);
+    const [volume, setVolume] = useState(0.8);
+    const url = folder + '/' + stem + '.mp3';
+
+    const toggleStem = () => {
+      console.log('toggling ', stem, 'from ', muted, 'to ', !muted);
+      setMute(!muted); };
+
+    const handleVolumeChange = (e, v) => {
+      console.log("volumme", e, v)
+      setVolume(v);
+    }
+
+    return (
+      <div className={'stem ' + stem}>
+        <div className='stem-title'>
+          <ReactPlayer
+            width='0px'
+            height='0px'
+            url={url}
+            playing={playing}
+            muted={muted}
+            volume={volume}
+            onReady={onReady}
+            onStart={() => console.log(stem, 'Start')}
+            onPause={() => console.log(stem, 'Pause')}
+            onBuffer={() => console.log(stem, 'onBuffer')}
+            onSeek={e => console.log('onSeek', e)}
+            onError={e => console.log('onError', e)}
+          />
+          <Typography id="label" align="center">{stem}</Typography>
+        </div>
+        <div className='stem-slider'>
+          <Slider
+            orientation="vertical"
+            min={0} max={1}
+            step={0.01}
+            value={volume}
+            scale={x => x*100}
+            onChange={handleVolumeChange}
+            color="primary"
+            aria-labelledby="label"
+          />
+        </div>
+      </div>
+    );
+  }
+
+  function PlayPauseButton(props) {
+    const {onClick, playing} = props;
+    const play_pause = playing ?  <PauseCircleFilledIcon fontSize="inherit"/> : <PlayCircleFilledIcon fontSize="inherit"/>
+    return (
+      <IconButton color="primary" aria-label="play/pause" onClick={onClick}>
+        {play_pause}
+      </IconButton>
+    );
+  }
+
+
   return (
     <div className='player'>
       <div className='stem-group'>
@@ -126,63 +185,7 @@ function Player(props) {
 }
 
 
-function Stem(props) {
-  const {folder, stem, playing, onReady} = props;
-  const [muted, setMute] = useState(false);
-  const [volume, setVolume] = useState(0.8);
-  const url = folder + '/' + stem + '.mp3';
 
-  const toggleStem = () => {
-    console.log('toggling ', stem, 'from ', muted, 'to ', !muted);
-    setMute(!muted); };
-
-  const handleVolumeChange = (e, v) => {
-    console.log("volumme", e, v)
-    setVolume(v);
-  }
-
-  return (
-    <div className={'stem ' + stem}>
-      <ReactPlayer
-        width='0px'
-        height='1px'
-        url={url}
-        playing={playing}
-        muted={muted}
-        volume={volume}
-        onReady={onReady}
-        onStart={() => console.log(stem, 'Start')}
-        onPause={() => console.log(stem, 'Pause')}
-        onBuffer={() => console.log(stem, 'onBuffer')}
-        onSeek={e => console.log('onSeek', e)}
-        onError={e => console.log('onError', e)}
-      />
-      <Typography id="label">{stem}</Typography>
-      <Slider
-        orientation="vertical"
-        min={0} max={1}
-        step={0.01}
-        value={volume}
-        scale={x => x*100}
-        onChange={handleVolumeChange}
-        color="primary"
-        aria-labelledby="label"
-      />
-    </div>
-  );
-}
-
-
-function PlayPauseButton(props) {
-  const {onClick, playing} = props;
-  const play_pause = playing ?  <PauseCircleFilledIcon fontSize="inherit"/> : <PlayCircleFilledIcon fontSize="inherit"/>
-
-  return (
-    <IconButton color="primary" aria-label="play/pause" onClick={onClick}>
-      {play_pause}
-    </IconButton>
-  );
-}
 
 
 export default App;
