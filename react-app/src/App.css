@@ -1,38 +1,111 @@
-.App {
-  text-align: center;
-}
 
-.App-logo {
-  height: 40vmin;
-  pointer-events: none;
-}
+#root {
+  position: absolute;
+  bottom: 0px;
+  top: 0px;
+  left: 0px;
+  right: 0px;
 
-@media (prefers-reduced-motion: no-preference) {
-  .App-logo {
-    animation: App-logo-spin infinite 20s linear;
-  }
-}
-
-.App-header {
-  background-color: #282c34;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  font-size: calc(10px + 2vmin);
+  background-color: black;
   color: white;
 }
 
-.App-link {
-  color: #61dafb;
+
+.App {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-@keyframes App-logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+#grad {
+  position: absolute;
+  width: 1897px;
+  height: 1913px;
+  left: 88.02px;
+  top: 550.38px;
+  background: radial-gradient(41.76% 41.76% at 119.2% 47.28%, #095DFF 0%, rgba(191, 9, 255, 0) 100%);
+  transform: rotate(143.33deg);
+}
+
+#heading1 {
+  position: absolute;
+  top: 30%;
+  left: 5%;
+  color: white;
+  font-family: Kantumruy;
+  font-style: normal;
+  font-weight: normal;
+  font-size: 130px;
+  line-height: 26px;
+}
+
+.wrap{
+  position: absolute;
+  top: 50%;
+  left: 5%;
+  margin-top: 30px;
+  /* transform: translate(-50%, -50%); */
+}
+
+.searchTerm {
+  width: 700px;
+  height: 50px;
+  background-color: #444444;
+  color: white;
+  border-radius: 12px;
+  padding: 5px 30px;
+  display: flex;
+}
+
+::placeholder {
+  color: white;
+}
+
+.player {
+  height: 80%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+}
+
+.play-btn {
+  text-align:center;
+  align-self: center;
+  justify-content: space-between;
+}
+
+.stem-group {
+  display: flex;
+  /* justify-content: space-between; */
+}
+
+.stem {
+  display: flex;
+  align-items: stretch;
+  position: relative;
+  height: 300px;
+  width: 100px;
+  margin: 0px 40px;
+  display: inline-block;
+}
+
+.MuiSlider-root {
+  position:absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%,-50%)!important;
+}
+
+#label {
+  position:relative;
+  left: 50%;
+  transform: translate(-50%, 0%)!important;
+  margin: 20px 0px;
+  text-align: center;
+}
+
+.MuiIconButton-root {
+  font-size: 4.5rem!important;
 }

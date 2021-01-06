@@ -1,7 +1,20 @@
 import React, { useState } from 'react'
 import ReactPlayer from 'react-player/file'
+import { styled } from "@material-ui/core/styles";
+import { spacing } from "@material-ui/system";
+import MuiButton from "@material-ui/core/Button";
+import Slider from '@material-ui/core/Slider';
+import Typography from "@material-ui/core/Typography";
+// import TextField from '@material-ui/core/TextField';
+// import InputAdornment from '@material-ui/core/InputAdornment';
+// import YouTubeIcon from '@material-ui/icons/YouTube';
+import IconButton from '@material-ui/core/IconButton';
+import PauseCircleFilledIcon from '@material-ui/icons/PauseCircleFilled';
+import PlayCircleFilledIcon from '@material-ui/icons/PlayCircleFilled';
+import './App.css'
 
 const API_BASE_URL = 'http://localhost:5000/api/'
+const Button = styled(MuiButton)(spacing)
 // const FILE_SERVER = 'http://localhost:8000/'
 
 function App() {
@@ -26,7 +39,6 @@ function App() {
       console.log(url, urlID, eta)
   }
 
-
   function runInference() {
     console.log('running inference for url', url);
     var infer_api_str = API_BASE_URL + "demux?url=" + url;
@@ -43,7 +55,6 @@ function App() {
     console.log(response);
   }
 
-
   function EtaDisplay() {
     if (eta > 0) {
       return (
@@ -57,9 +68,11 @@ function App() {
   }
 
 
+
+
   return (
-    <div className='app'>
-      <Form getURLInfo={getURLInfo} />
+    <div className='App'>
+      {/* <Form getURLInfo={getURLInfo} /> */}
       <EtaDisplay />
       <Player folder={inferMsg} />
     </div>
@@ -70,23 +83,20 @@ function App() {
 function Form(props) {
   const getURLInfo = props.getURLInfo;
   const [userInput, setUserInput] = useState('');
-
-
   const handleChange = (e) => { setUserInput(e.target.value); };
-
   const handleSubmit = (e) => {
     e.preventDefault();
     getURLInfo(userInput);
   };
 
   return (
-    <form className='user-input-form' onSubmit={handleSubmit}>
-      <label>
-        Youtube URL
-        <input type='text' name='input-url' onChange={handleChange} />
-      </label>
-      <input type='submit' value="Get ETA!" />
-    </form>
+    <>
+      <div id='heading1'>Ready to play?</div>
+      <div class="wrap">
+        <input type="text" class="searchTerm" placeholder="Paste URL here" />
+        <Button className="button" mt="25px" px="45px" variant="contained" color="primary">Go</Button>
+      </div>
+    </>
   )
 }
 
@@ -105,10 +115,12 @@ function Player(props) {
 
   return (
     <div className='player'>
-      {stems.map(stem => <Stem folder={folder} playing={playing} stem={stem} onReady={() => setStemsReady(stemsReady + 1)}/>)}
-      <br/>
-      <br/>
-      <button onClick={handlePlayPause}> Play/Pause </button>
+      <div className='stem-group'>
+        {stems.map(stem => <Stem folder={folder} playing={playing} stem={stem} onReady={() => setStemsReady(stemsReady + 1)}/>)}
+      </div>
+      <div className='play-btn'>
+        <PlayPauseButton onClick={handlePlayPause} playing={playing} style={{justifyContent: 'center'}} > Play/Pause </PlayPauseButton>
+      </div>
     </div>
   )
 }
@@ -124,16 +136,14 @@ function Stem(props) {
     console.log('toggling ', stem, 'from ', muted, 'to ', !muted);
     setMute(!muted); };
 
-  const handleVolumeChange = e => {
-    setVolume(parseFloat(e.target.value))
+  const handleVolumeChange = (e, v) => {
+    console.log("volumme", e, v)
+    setVolume(v);
   }
 
   return (
-    <div className={'stem-group-' + stem}>
-      <button className={'stem-button-' + stem} onClick={toggleStem}> {stem} </button>
-
+    <div className={'stem ' + stem}>
       <ReactPlayer
-        className={'stem-track-' + stem}
         width='0px'
         height='1px'
         url={url}
@@ -147,13 +157,32 @@ function Stem(props) {
         onSeek={e => console.log('onSeek', e)}
         onError={e => console.log('onError', e)}
       />
-
-      <input className='volume-slider' type='range' min={0} max={1} step='any' value={volume} onChange={handleVolumeChange} />
+      <Typography id="label">{stem}</Typography>
+      <Slider
+        orientation="vertical"
+        min={0} max={1}
+        step={0.01}
+        value={volume}
+        scale={x => x*100}
+        onChange={handleVolumeChange}
+        color="primary"
+        aria-labelledby="label"
+      />
     </div>
   );
 }
 
 
+function PlayPauseButton(props) {
+  const {onClick, playing} = props;
+  const play_pause = playing ?  <PauseCircleFilledIcon fontSize="inherit"/> : <PlayCircleFilledIcon fontSize="inherit"/>
+
+  return (
+    <IconButton color="primary" aria-label="play/pause" onClick={onClick}>
+      {play_pause}
+    </IconButton>
+  );
+}
 
 
 export default App;

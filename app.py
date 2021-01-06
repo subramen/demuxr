@@ -32,7 +32,7 @@ class S3Helper:
 
     # ls grep s3
     @staticmethod
-    def _file_in_cache(self, object_name):
+    def _file_in_cache(object_name):
         s3_client = boto3.client('s3')
         try:
             r = s3_client.head_object(
@@ -166,7 +166,7 @@ def info():
     return get_video_info(url)
 
 
-# @app.route("/api/demux")
+@app.route("/api/demux")
 @cross_origin()
 def main():
     response = {'msg': '', 'status': ''}
