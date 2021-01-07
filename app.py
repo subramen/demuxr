@@ -169,7 +169,7 @@ def info():
 @app.route("/api/demux")
 @cross_origin()
 def main():
-    response = {'msg': '', 'status': ''}
+    response = {'msg': '', 'status': 0}
     url = request.args.get('url')
     logger.info(f'Pinging /api/demux with param = {url}')
 
@@ -187,7 +187,11 @@ def main():
         stem_bytes = run_inference(info_dict['mp3_bytes'])
         logger.info("Inference done. Caching results...")
         upload_success = s3.upload_stems(stem_bytes)
-        logger.info(f"Upload to cache success: {upload_success}")
+        if upload_success:
+            logger.info(f"Upload to cache success!")
+        else:
+            logger.error("Upload to cache failed!")
+            return response
 
     logger.info(f'Returning stems at {s3.access_point}')
     response['status'] = 200
