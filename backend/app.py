@@ -4,8 +4,8 @@ from flask_cors import CORS, cross_origin
 import youtube_dl
 from pathlib import Path
 import tempfile
-from botocore.exceptions import ClientError
 from loguru import logger
+from botocore.exceptions import ClientError
 import boto3
 import io
 
@@ -201,4 +201,4 @@ def main():
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(host="0.0.0.0", port=5000)

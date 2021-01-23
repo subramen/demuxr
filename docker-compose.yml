@@ -1,0 +1,25 @@
+services:
+  model:
+    build: ./model
+    ports:
+      - "8080:8080"
+      - "8081:8081"
+    healthcheck:
+      test: ["CMD" , "curl", "http://localhost:8080/ping"]
+      timeout: 3m
+    container_name: Model
+  backend:
+    build: ./backend
+    ports:
+      - "5000:5000"
+    depends_on:
+      - model
+    container_name: Backend
+  frontend:
+    build: ./frontend
+    ports: 
+      - "3000:80"
+    depends_on:
+      - backend
+    container_name: Frontend
+

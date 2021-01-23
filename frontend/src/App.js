@@ -5,9 +5,6 @@ import { spacing } from "@material-ui/system";
 import MuiButton from "@material-ui/core/Button";
 import Slider from '@material-ui/core/Slider';
 import Typography from "@material-ui/core/Typography";
-// import TextField from '@material-ui/core/TextField';
-// import InputAdornment from '@material-ui/core/InputAdornment';
-// import YouTubeIcon from '@material-ui/icons/YouTube';
 import IconButton from '@material-ui/core/IconButton';
 import PauseCircleFilledIcon from '@material-ui/icons/PauseCircleFilled';
 import PlayCircleFilledIcon from '@material-ui/icons/PlayCircleFilled';
@@ -15,7 +12,6 @@ import './App.css'
 
 const API_BASE_URL = 'http://localhost:5000/api/'
 const Button = styled(MuiButton)(spacing)
-// const FILE_SERVER = 'http://localhost:8000/'
 
 function App() {
   const [url, setURL] = useState('');
@@ -46,7 +42,7 @@ function App() {
     console.log('running inference for url', url);
     var infer_api_str = API_BASE_URL + "demux?url=" + url;
 
-    const response = fetch(infer_api_str)
+    fetch(infer_api_str)
       .then(res => res.json())
       .then(data => {
         setInferMsg(data['msg']);
@@ -84,7 +80,7 @@ function App() {
 
 function UserInput(props) {
   const {getURLInfo, runInference} = props;
-  const [userInput, setUserInput] = useState('');
+  // const [userInput, setUserInput] = useState('');
   const handleChange = (e) => { getURLInfo(e.target.value) };
   const handleSubmit = (e) => {
     e.preventDefault();
