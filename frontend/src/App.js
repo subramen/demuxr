@@ -3,9 +3,7 @@ import ReactPlayer from 'react-player/file'
 import { styled } from "@material-ui/core/styles";
 import { spacing } from "@material-ui/system";
 import MuiButton from "@material-ui/core/Button";
-import Slider from '@material-ui/core/Slider';
-import Typography from "@material-ui/core/Typography";
-import IconButton from '@material-ui/core/IconButton';
+import { LinearProgress, IconButton, Typography, Slider } from '@material-ui/core';
 import PauseCircleFilledIcon from '@material-ui/icons/PauseCircleFilled';
 import PlayCircleFilledIcon from '@material-ui/icons/PlayCircleFilled';
 import './App.css'
@@ -17,7 +15,7 @@ function App() {
   const [url, setURL] = useState('');
   const [urlID, setURLID] = useState('');
   const [eta, setETA] = useState(-1);
-  const [tooLong, setTooLong] = useState(0);
+  const [loading, setLoading] = useState(false);
   const [inferHTTP, setInferHTTP] = useState(0);
   const [inferMsg, setInferMsg] = useState('');
 
@@ -30,7 +28,6 @@ function App() {
       .then(data => {
         setURLID(data['id']);
         setETA(data['eta']);
-        setTooLong(data['too_long']);
       })
       .catch(error => console.error(error));
 
@@ -41,71 +38,85 @@ function App() {
   function runInference() {
     console.log('running inference for url', url);
     var infer_api_str = API_BASE_URL + "demux?url=" + url;
+    setLoading(true);
 
     fetch(infer_api_str)
       .then(res => res.json())
       .then(data => {
         setInferMsg(data['msg']);
-        console.log("inferMsg: ", inferMsg);
         setInferHTTP(data['status']);
+        setLoading(false);
+        console.log("inferMsg: ", inferMsg);
         console.log("inferHTTP: ", inferHTTP);})
       .then(() => console.log("response is", inferMsg))
-      .catch(error => console.error(error));
+      .catch(error => { 
+        console.error(error);
+        setLoading(false);
+      });
   }
 
-  function EtaDisplay() {
-    if (eta > 0) {
-      return (
-        <div className='eta'>
-          <div className='eta-display'> ETA: {eta} </div>
-          <button onClick={runInference}> Run inference </button>
-        </div>
-      )
-    }
-    return <div className='eta' />
-  }
 
   const displayScreen = (inferHTTP === 200) ?
     <Player folder={inferMsg} /> :
-    <UserInput getURLInfo={getURLInfo} runInference={runInference}/>;
+    <div>
+      <UserInput getURLInfo={getURLInfo} runInference={runInference}/>
+      {loading ? <LinearProgress show={loading} /> : null}
+    </div>
 
   return (
     <div className='App'>
       {displayScreen}
-      {/* <EtaDisplay /> */}
     </div>
   );
 }
 
 
-function UserInput(props) {
-  const {getURLInfo, runInference} = props;
-  // const [userInput, setUserInput] = useState('');
-  const handleChange = (e) => { getURLInfo(e.target.value) };
+function UserInput({ getURLInfo, runInference }) {
   const handleSubmit = (e) => {
     e.preventDefault();
-    setTimeout(runInference, 3000);
+    setTimeout(runInference, 1000);
   };
 
   return (
     <div className="user-input">
       <Typography variant="h1" align="left">Ready to play?</Typography>
       <div className="wrap">
-        <input type="text" className="search-bar" placeholder="Paste URL here" onChange={handleChange}/>
+        <input type="text" className="search-bar" placeholder="Paste URL here" onChange={(e) => { getURLInfo(e.target.value) }}/>
         <Button onClick={handleSubmit} className="button" mt="25px" px="45px" variant="contained" color="primary">Go</Button>
       </div>
     </div>
   );
 }
 
+function Player({folder}) {
+  const [readyToPlay, setReadyToPlay] = useState(false);
+  const [playing, setPlaying] = useState(false);
 
-function PlayPauseButton(props) {
-  const {onClick, playing, disabled} = props;
-  const play_pause = playing ?  <PauseCircleFilledIcon fontSize="inherit"/> : <PlayCircleFilledIcon fontSize="inherit"/>
   return (
-    <IconButton color="primary" aria-label="play/pause" onClick={onClick} disabled={disabled}>
-      {play_pause}
-    </IconButton>
+    <div className='player'>
+      <StemGroup folder={folder} playing={playing} setReadyToPlay={setReadyToPlay} />
+      <div className='play-btn'>
+        <PlayPauseButton onClick={() => {setPlaying(!playing)}} playing={playing} disabled={!readyToPlay} > Play/Pause </PlayPauseButton>
+      </div>
+    </div>
+  );
+}
+
+function StemGroup({folder, playing, setReadyToPlay}) {
+  const stems = ['original', 'bass', 'drums', 'other', 'vocals'];
+  let readyCount = 0;
+  const handleReady = () => {
+    readyCount += 1;
+    if (readyCount === stems.length) {
+      setReadyToPlay(true);
+      console.log('ready to play!')
+    }
+  };
+
+  return (
+    <div className='stem-group'>
+        {stems.map(stem => <Stem folder={folder} playing={playing} stem={stem} key={stem} onReady={handleReady}/>)}
+    </div>
   );
 }
 
@@ -158,41 +169,16 @@ function Stem(props) {
   );
 }
 
-function StemGroup(props) {
-  const stems = ['original', 'bass', 'drums', 'other', 'vocals']
-  const {folder, playing, setReadyToPlay} = props;
-
-  let readyCount = 0;
-  const handleReady = () => {
-    readyCount += 1;
-    if (readyCount === stems.length) {
-      setReadyToPlay(true);
-      console.log('ready to play!')
-    }
-  };
-
+function PlayPauseButton(props) {
+  const {onClick, playing, disabled} = props;
+  const play_pause = playing ?  <PauseCircleFilledIcon fontSize="inherit"/> : <PlayCircleFilledIcon fontSize="inherit"/>
   return (
-    <div className='stem-group'>
-        {stems.map(stem => <Stem folder={folder} playing={playing} stem={stem} key={stem} onReady={handleReady}/>)}
-    </div>
+    <IconButton color="primary" aria-label="play/pause" onClick={onClick} disabled={disabled}>
+      {play_pause}
+    </IconButton>
   );
 }
 
-function Player(props) {
-  const stems = ['original', 'bass', 'drums', 'other', 'vocals']
-  const folder = props.folder;
-  const [readyToPlay, setReadyToPlay] = useState(false);
-  const [playing, setPlaying] = useState(false);
-
-  return (
-    <div className='player'>
-      <StemGroup folder={folder} playing={playing} setReadyToPlay={setReadyToPlay} />
-      <div className='play-btn'>
-        <PlayPauseButton onClick={() => {setPlaying(!playing)}} playing={playing} disabled={!readyToPlay} > Play/Pause </PlayPauseButton>
-      </div>
-    </div>
-  );
-}
 
 
 
