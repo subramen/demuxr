@@ -12,7 +12,7 @@ services:
     healthcheck:
       test: ["CMD" , "curl", "http://localhost:8080/ping"]
       timeout: 3m
-    container_name: Model
+    container_name: model
   flask:
     build:
       context: ./flask
@@ -24,12 +24,12 @@ services:
       - "5000:5000"
     depends_on:
       - model
-    container_name: Flask
+    container_name: flask
   frontend:
     build: ./frontend
     ports: 
       - "3000:80"
     depends_on:
       - flask
-    container_name: Frontend
+    container_name: frontend
 

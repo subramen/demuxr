@@ -12,7 +12,7 @@ import json
 
 app = Flask(__name__)
 cors = CORS(app)
-torchserve_url = "http://Model:8080/"
+torchserve_url = "http://model:8080/"
 pred_endpoint = "predictions/demucs/1"
 MAX_AUDIO_DURATION = 6500
 

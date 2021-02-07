@@ -10,7 +10,7 @@ import PauseCircleFilledIcon from '@material-ui/icons/PauseCircleFilled';
 import PlayCircleFilledIcon from '@material-ui/icons/PlayCircleFilled';
 import './App.css'
 
-const API_BASE_URL = 'http://Flask:5000/api/'
+const API_BASE_URL = 'http://localhost:5000/api/'
 const Button = styled(MuiButton)(spacing)
 
 function App() {
