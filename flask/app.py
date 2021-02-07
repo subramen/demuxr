@@ -8,35 +8,28 @@ from loguru import logger
 from botocore.exceptions import ClientError
 import boto3
 import io
+import json
 
 app = Flask(__name__)
 cors = CORS(app)
-torchserve_url = "http://127.0.0.1:8080/"
-pred_endpoint = "predictions/demucs_state/1"
+torchserve_url = "http://Model:8080/"
+pred_endpoint = "predictions/demucs/1"
 MAX_AUDIO_DURATION = 6500
 
 
 class S3Helper:
     def __init__(self, folder):
+        self.bucket = 'demucs-app-cache'
         self.folder = folder
-        self.access_point = S3Helper.get_url() + folder
-
-    # to do - put this in config
-    @staticmethod
-    def get_url():
-        return 'http://' + S3Helper.get_bucket() + '.s3.amazonaws.com/'
-
-    @staticmethod
-    def get_bucket():
-        return 'jammates-audio'
+        bucket_url = f'http://{self.bucket}.s3.amazonaws.com/'
+        self.access_point = bucket_url + folder
 
     # ls grep s3
-    @staticmethod
-    def _file_in_cache(object_name):
+    def _file_in_cache(self, object_name):
         s3_client = boto3.client('s3')
         try:
             r = s3_client.head_object(
-                Bucket=S3Helper.get_bucket(),
+                Bucket=self.bucket,
                 Key=object_name)
         except ClientError:
             logger.debug(f"{object_name} doesn't exist in S3 cache")
@@ -44,13 +37,12 @@ class S3Helper:
         return True
 
     # upload to s3
-    @staticmethod
-    def _upload_file(bytes_like, object_name):
+    def _upload_file(self, bytes_like, object_name):
         s3_client = boto3.client('s3')
         logger.debug(f'Uploading {object_name}')
         s3_client.upload_fileobj(
             io.BytesIO(bytes_like),
-            S3Helper.get_bucket(),
+            self.bucket,
             object_name,
             ExtraArgs={'ACL':'public-read'})
         return True
@@ -65,28 +57,7 @@ class S3Helper:
             self._upload_file(byt, obj_name)
         return True
 
-    # download from s3
-    # def _download_file(self, object_name):
-    #     x = io.BytesIO()
-    #     try:
-    #         self.s3_client.download_fileobj(self.S3_BUCKET, object_name, x)
-    #         x.seek(0)
-    #         blob = x.read()
-    #         x.close()
-    #     except ClientError as e:
-    #         return False
-    #     return blob
-
-    # @logger.catch
-    # def retrieve_stems():
-    #     stem_names = ["drums", "bass", "other", "vocals"]
-    #     stems_bytes = {}
-    #     for stem in stem_names:
-    #         obj_name = self.folder + '/' + stem + '.mp3'
-    #         stems_bytes[stem] = self._download_file(obj_name)
-    #     return stems_bytes
-
-
+   
 # get ETA + other things
 def get_video_info(url):
     info_dict = youtubedl(url, False)
@@ -134,12 +105,18 @@ def ping_torchserve():
 def run_inference(mp3_bytes):
     logger.info(f"Initializing inference for mp3 of {len(mp3_bytes)}")
     pred_url = torchserve_url + pred_endpoint
+
+    # check if server ping is healthy
+    logger.info("Checking torchserve health... ")
+    status = json.loads(requests.get(torchserve_url+'ping').text)['status']
+    if status != "Healthy":
+        logger.error(f"Torchserve status: {status}")
+        raise RuntimeError("Torchserve model is not healthy")
+    logger.debug("Torchserve is healthy")
+
     response = requests.post(url=pred_url, data=mp3_bytes, headers={'Content-Type': 'audio/mpeg'})
 
-    if response.status_code != 200:
-        logger.error(f"HTTP failed with {response.status_code} | {response.text}")
-        raise RuntimeError("Torchserve inference failed!")
-    else:
+    if response.status_code == 200:
         logger.debug("Inference done! Saving...")
         bytebuf = response.content
         n = len(bytebuf)//4
@@ -148,6 +125,9 @@ def run_inference(mp3_bytes):
         stem_bytes = dict(zip(source_names, stems))
         stem_bytes['original'] = mp3_bytes
         return stem_bytes
+    else:
+        logger.error(f"HTTP failed with {response.status_code} | {response.text}")
+        raise RuntimeError("Torchserve inference failed!")
 
 
 def validate_url(url):

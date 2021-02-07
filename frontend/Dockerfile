@@ -1,7 +1,9 @@
-FROM node:latest as build
+FROM node:alpine as build
 RUN mkdir /app
 COPY . /app
 WORKDIR /app
+
+RUN apk add --no-cache ca-certificates
 RUN npm install
 RUN npm run build
 

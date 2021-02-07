@@ -9,3 +9,4 @@ cli.txt
 resp.txt
 *.json
 node_modules*
+.env

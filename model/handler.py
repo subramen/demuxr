@@ -116,11 +116,3 @@ class DemucsHandler(BaseHandler):
         return self.postprocess(stems, track_folder)
 
 
-
-
-
-
-# option 1: save to disk, return path
-# option 2: return multiple bytearrays instead of only 1 per example
-    # isinstance(val, tuple):
-        # loop
