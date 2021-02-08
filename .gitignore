@@ -7,6 +7,6 @@ TEMP*
 *.pt
 cli.txt
 resp.txt
-*.json
+package-lock.json
 node_modules*
 .env
