@@ -63,10 +63,11 @@ def get_video_info(url):
     info_dict = youtubedl(url, False)
     response = {
         'url': url,
+        'title': info_dict['title'],
         'id': info_dict['id'],
-        'eta': info_dict['duration'],
-        'too_long': int(info_dict['duration'] > MAX_AUDIO_DURATION)
+        'eta': info_dict['duration'] + 120, # add 2 minutes buffer
     }
+    logger.info(response)
     return response
 
 
@@ -93,11 +94,14 @@ def youtubedl(url, download=True):
 
 
 # check if torchserve is up
-def ping_torchserve():
-    response = requests.get(torchserve_url+'ping')
-    if response['health']=='healthy!':
-        return True
-    return False
+def torchserve_healthy():
+    logger.info("Checking torchserve health... ")
+    status = json.loads(requests.get(torchserve_url+'ping').text)['status']
+    if status != "Healthy":
+        logger.error(f"Torchserve status: {status}")
+        return False
+    logger.debug("Torchserve is healthy")
+    return True
 
 
 # get the stems in bytes
@@ -107,12 +111,8 @@ def run_inference(mp3_bytes):
     pred_url = torchserve_url + pred_endpoint
 
     # check if server ping is healthy
-    logger.info("Checking torchserve health... ")
-    status = json.loads(requests.get(torchserve_url+'ping').text)['status']
-    if status != "Healthy":
-        logger.error(f"Torchserve status: {status}")
-        raise RuntimeError("Torchserve model is not healthy")
-    logger.debug("Torchserve is healthy")
+    if not torchserve_healthy():
+        raise RuntimeError("Model server not healthy!")
 
     response = requests.post(url=pred_url, data=mp3_bytes, headers={'Content-Type': 'audio/mpeg'})
 
@@ -132,7 +132,7 @@ def run_inference(mp3_bytes):
 
 def validate_url(url):
     info = get_video_info(url)
-    if info['too_long']:
+    if info['eta'] > MAX_AUDIO_DURATION:
         logger.error("URL Validation Failed! Video is too long")
         return False, (413, 'Video too long')
     return True, (200, 'OK')

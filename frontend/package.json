@@ -16,7 +16,7 @@
   },
   "scripts": {
     "build": "react-scripts build",
-    "start": "react-scripts start"
+    "start": "HOST=0.0.0.0 react-scripts start"
   },
   "author": "",
   "license": "ISC",

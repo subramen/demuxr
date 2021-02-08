@@ -3,18 +3,18 @@ import ReactPlayer from 'react-player/file'
 import { styled } from "@material-ui/core/styles";
 import { spacing } from "@material-ui/system";
 import MuiButton from "@material-ui/core/Button";
-import { LinearProgress, IconButton, Typography, Slider } from '@material-ui/core';
+import { LinearProgress, IconButton, Typography, Slider, CircularProgress } from '@material-ui/core';
 import PauseCircleFilledIcon from '@material-ui/icons/PauseCircleFilled';
 import PlayCircleFilledIcon from '@material-ui/icons/PlayCircleFilled';
 import './App.css'
 
-const API_BASE_URL = 'http://localhost:5000/api/'
+const API_BASE_URL = '/api/'
+// const API_BASE_URL = 'http://localhost:5000/api/'
 const Button = styled(MuiButton)(spacing)
 
 function App() {
   const [url, setURL] = useState('');
-  const [urlID, setURLID] = useState('');
-  const [eta, setETA] = useState(-1);
+  const [urlData, setUrlData] = useState({});
   const [loading, setLoading] = useState(false);
   const [inferHTTP, setInferHTTP] = useState(0);
   const [inferMsg, setInferMsg] = useState('');
@@ -26,12 +26,10 @@ function App() {
     fetch(info_api_str)
       .then(response => response.json())
       .then(data => {
-        setURLID(data['id']);
-        setETA(data['eta']);
+        setUrlData(data);
+        console.log(urlData);
       })
       .catch(error => console.error(error));
-
-    console.log(url, urlID, eta)
     return true;
   }
 
@@ -60,7 +58,8 @@ function App() {
     <Player folder={inferMsg} /> :
     <div>
       <UserInput getURLInfo={getURLInfo} runInference={runInference}/>
-      {loading ? <LinearProgress show={loading} /> : null}
+      {loading ? <CircularProgress /> : null}
+
     </div>
 
   return (
