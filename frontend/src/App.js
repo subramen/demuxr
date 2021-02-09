@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import ReactPlayer from 'react-player/file'
 import { styled } from "@material-ui/core/styles";
 import { spacing } from "@material-ui/system";
@@ -23,13 +23,15 @@ function App() {
     setURL(url);
     console.log('url set to ', url)
     var info_api_str = API_BASE_URL+ "info?url=" + url;
-    fetch(info_api_str)
-      .then(response => response.json())
-      .then(data => {
-        setUrlData(data);
-        console.log(urlData);
-      })
-      .catch(error => console.error(error));
+    if (url !== '') {
+      fetch(info_api_str)
+        .then(response => response.json())
+        .then(data => {
+          setUrlData(data);
+          console.log(data);
+        })
+        .catch(error => console.error(error));
+    }
     return true;
   }
 
@@ -46,7 +48,6 @@ function App() {
         setLoading(false);
         console.log("inferMsg: ", inferMsg);
         console.log("inferHTTP: ", inferHTTP);})
-      .then(() => console.log("response is", inferMsg))
       .catch(error => { 
         console.error(error);
         setLoading(false);
@@ -57,9 +58,7 @@ function App() {
   const displayScreen = (inferHTTP === 200) ?
     <Player folder={inferMsg} /> :
     <div>
-      <UserInput getURLInfo={getURLInfo} runInference={runInference}/>
-      {loading ? <CircularProgress /> : null}
-
+      <UserInput getURLInfo={getURLInfo} runInference={runInference} loading={loading} eta={urlData['eta']}/>
     </div>
 
   return (
@@ -70,7 +69,7 @@ function App() {
 }
 
 
-function UserInput({ getURLInfo, runInference }) {
+function UserInput({ getURLInfo, runInference, loading, eta }) {
   const handleSubmit = (e) => {
     e.preventDefault();
     setTimeout(runInference, 1000);
@@ -81,11 +80,32 @@ function UserInput({ getURLInfo, runInference }) {
       <Typography variant="h1" align="left">Ready to play?</Typography>
       <div className="wrap">
         <input type="text" className="search-bar" placeholder="Paste URL here" onChange={(e) => { getURLInfo(e.target.value) }}/>
-        <Button onClick={handleSubmit} className="button" mt="25px" px="45px" variant="contained" color="primary">Go</Button>
+        <span className="btn_progress">
+          <Button onClick={handleSubmit} mt="25px" px="45px" variant="contained" color="primary">Go</Button>
+          { loading ? <TimedProgress eta={eta} /> : null}
+        </span>
       </div>
     </div>
   );
 }
+
+const TimedProgress = ({ eta }) => {
+  const [secElapsed, setSecElapsed] = useState(0)
+  const [progress, setProgress] = useState(0);
+  
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setSecElapsed(secElapsed + 1);
+      setProgress(oldProgress => oldProgress >= 100 ? 0 : Math.floor(secElapsed * 100 / eta));
+    }, 1000);
+    console.log(secElapsed, progress);  
+    return () => clearInterval(timer);
+  });
+
+  return ( 1 ?     
+      <CircularProgress variant="determinate" size={60} thickness={5} style={{"marginTop":'20px', "marginLeft": "15px"}} value={progress}/>
+      : null);
+};
 
 function Player({folder}) {
   const [readyToPlay, setReadyToPlay] = useState(false);

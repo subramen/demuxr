@@ -35,6 +35,12 @@ html, body {
   align-items: flex-start;
 }
 
+.btn_progress {
+  display: flex;
+  flex-direction: column;
+  align-items: normal;
+}
+
 .search-bar {
   width: 100%;
   height: 50px;
