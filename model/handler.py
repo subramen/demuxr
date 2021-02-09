@@ -10,6 +10,7 @@ from model import Demucs
 
 import torch
 from ts.torch_handler.base_handler import BaseHandler
+import shutil
 
 logger = logging.getLogger(__name__)
 
@@ -94,15 +95,15 @@ class DemucsHandler(BaseHandler):
 
 
     # From https://github.com/facebookresearch/demucs/blob/dd7a77a0b2600d24168bbe7a40ef67f195586b62/demucs/separate.py#L207
-    def postprocess(self, inference_output, track_folder) -> Path:
+    def postprocess(self, inference_output) -> Path:
         print("[SURAJ] starting postprocess")
 
         out_msg = bytearray()
         source_names = ["drums", "bass", "other", "vocals"]
-        for source, name in zip(inference_output, source_names):
+        for source, _ in zip(inference_output, source_names):
             source = (source * 2**15).clamp_(-2**15, 2**15 - 1).short()
             source = source.transpose(0,1).numpy()
-            out_msg += encode_mp3(source, str(track_folder / name) + ".mp3")
+            out_msg += encode_mp3(source)
 
         print(f"[SURAJ] Bytearray length: {len(out_msg)}")
         return [out_msg]
@@ -110,9 +111,9 @@ class DemucsHandler(BaseHandler):
     def handle(self, data, context):
         track_folder = self.filedir / str(uuid.uuid4())
         track_folder.mkdir(parents=True)
-
         wav = self.preprocess(data, track_folder)
+        shutile.rmtree(track_folder)
         stems = self.inference(wav)
-        return self.postprocess(stems, track_folder)
+        return self.postprocess(stems)
 
 

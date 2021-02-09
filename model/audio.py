@@ -13,7 +13,7 @@ import torch
 from utils import temp_filenames
 
 
-def encode_mp3(wav, path, verbose=False):
+def encode_mp3(wav, verbose=False):
     try:
         import lameenc
     except ImportError:
@@ -31,8 +31,6 @@ def encode_mp3(wav, path, verbose=False):
         encoder.silence()
     mp3_data = encoder.encode(wav.tostring())
     mp3_data += encoder.flush()
-    # with open(path, "wb") as f:
-    #     f.write(mp3_data)
     return mp3_data
 
 
