@@ -20,8 +20,6 @@ function App() {
   const [inferMsg, setInferMsg] = useState('');
 
   function getURLInfo(url) {
-    setURL(url);
-    console.log('url set to ', url)
     var info_api_str = API_BASE_URL+ "info?url=" + url;
     if (url !== '') {
       fetch(info_api_str)
@@ -36,6 +34,8 @@ function App() {
   }
 
   function runInference() {
+    if (!urlData) getURLInfo(url);
+    
     console.log('running inference for url', url);
     var infer_api_str = API_BASE_URL + "demux?url=" + url;
     setLoading(true);
@@ -58,7 +58,7 @@ function App() {
   const displayScreen = (inferHTTP === 200) ?
     <Player folder={inferMsg} /> :
     <div>
-      <UserInput getURLInfo={getURLInfo} runInference={runInference} loading={loading} eta={urlData['eta']}/>
+      <UserInput setURL={setURL} runInference={runInference} loading={loading} eta={urlData['eta']}/>
     </div>
 
   return (
@@ -69,7 +69,7 @@ function App() {
 }
 
 
-function UserInput({ getURLInfo, runInference, loading, eta }) {
+function UserInput({ setURL, runInference, loading, eta }) {
   const handleSubmit = (e) => {
     e.preventDefault();
     setTimeout(runInference, 1000);
@@ -79,7 +79,7 @@ function UserInput({ getURLInfo, runInference, loading, eta }) {
     <div className="user-input">
       <Typography variant="h1" align="left">Ready to play?</Typography>
       <div className="wrap">
-        <input type="text" className="search-bar" placeholder="Paste URL here" onChange={(e) => { getURLInfo(e.target.value) }}/>
+        <input type="text" className="search-bar" placeholder="Paste URL here" onChange={(e) => { setURL(e.target.value); }}/>
         <span className="btn_progress">
           <Button onClick={handleSubmit} mt="25px" px="45px" variant="contained" color="primary">Go</Button>
           { loading ? <TimedProgress eta={eta} /> : null}
