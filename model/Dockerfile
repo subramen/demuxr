@@ -5,12 +5,8 @@ RUN pip3 install --upgrade pip && \
 
 USER root
 RUN apt-get update -y && apt-get install -y ffmpeg
+
 USER model-server
-
-ARG AWS_DEFAULT_REGION
-ARG AWS_ACCESS_KEY_ID
-ARG AWS_SECRET_ACCESS_KEY
-
 COPY . /home/model-server/
 WORKDIR /home/model-server/
 
