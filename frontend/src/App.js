@@ -56,16 +56,15 @@ function App() {
       });
   }
 
-
-  const displayScreen = (inferHTTP === 200) ?
-    <Player folder={inferMsg} /> :
-    <div>
-      <UserInput getURLInfo={getURLInfo} runInference={runInference} loading={loading} eta={urlData['eta']}/>
-    </div>
-
   return (
     <div className='App'>
-      {displayScreen}
+      <div className="wrapper">
+        <UserInput getURLInfo={getURLInfo} runInference={runInference} loading={true/*loading*/} eta={300/*urlData['eta']*/}/>
+        <Player folder={inferMsg} show={true /*inferHTTP === 200*/}/>
+        <aside className="sidebar">Sidebar</aside>
+        <div className="ad">Some ad</div>
+        <footer className="footer">Made with love by FBOSS</footer>
+      </div>
     </div>
   );
 }
@@ -79,19 +78,17 @@ function UserInput({ getURLInfo, runInference, loading, eta }) {
 
   return (
     <div className="user-input">
-      <Typography variant="h1" align="left">Ready to play?</Typography>
-      <div className="wrap">
+      <Typography className="prompt" variant="h1" align="left">Ready to play?</Typography>
         <input type="text" className="search-bar" placeholder="Paste URL here" onChange={(e) => { getURLInfo(e.target.value) }}/>
-        <span className="btn_progress">
-          <Button onClick={handleSubmit} mt="25px" px="45px" variant="contained" color="primary">Go</Button>
-          { loading ? <TimedProgress eta={eta} /> : null}
+        <span className="btn-progress">
+          <Button onClick={handleSubmit} px="45px" variant="contained" color="primary">Go</Button>
+          <TimedProgress loading={loading} eta={eta} />
         </span>
-      </div>
     </div>
   );
 }
 
-const TimedProgress = ({ eta }) => {
+const TimedProgress = ({ loading, eta }) => {
   const [secElapsed, setSecElapsed] = useState(0)
   const [progress, setProgress] = useState(0);
   
@@ -104,22 +101,24 @@ const TimedProgress = ({ eta }) => {
     return () => clearInterval(timer);
   });
 
-  return ( 1 ?     
-      <CircularProgress variant="determinate" size={60} thickness={5} style={{"marginTop":'20px', "marginLeft": "15px"}} value={progress}/>
+  return ( loading ?     
+      <CircularProgress variant="determinate" size={60} thickness={5} value={progress}/>
       : null);
 };
 
-function Player({folder}) {
+function Player({folder, show}) {
   const [readyToPlay, setReadyToPlay] = useState(false);
   const [playing, setPlaying] = useState(false);
 
-  return (
+  return ( show ?
     <div className='player'>
       <StemGroup folder={folder} playing={playing} setReadyToPlay={setReadyToPlay} />
       <div className='play-btn'>
         <PlayPauseButton onClick={() => {setPlaying(!playing)}} playing={playing} disabled={!readyToPlay} > Play/Pause </PlayPauseButton>
       </div>
     </div>
+    :
+    null
   );
 }
 
@@ -135,7 +134,7 @@ function StemGroup({folder, playing, setReadyToPlay}) {
   };
 
   return (
-    <div className='stem-group'>
+    <div className='stemgroup'>
         {stems.map(stem => <Stem folder={folder} playing={playing} stem={stem} key={stem} onReady={handleReady}/>)}
     </div>
   );
