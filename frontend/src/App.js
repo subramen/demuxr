@@ -62,8 +62,8 @@ function App() {
         <UserInput getURLInfo={getURLInfo} runInference={runInference} loading={true/*loading*/} eta={300/*urlData['eta']*/}/>
         <Player folder={inferMsg} show={true /*inferHTTP === 200*/}/>
         <aside className="sidebar">Sidebar</aside>
-        <div className="ad">Some ad</div>
-        <footer className="footer">Made with love by FBOSS</footer>
+        {/* <div className="ad">Some ad</div> */}
+        <footer className="footer">Made with &#127927; by @subramen</footer>
       </div>
     </div>
   );
@@ -78,7 +78,7 @@ function UserInput({ getURLInfo, runInference, loading, eta }) {
 
   return (
     <div className="user-input">
-      <Typography className="prompt" variant="h1" align="left">Ready to play?</Typography>
+      <Typography className="prompt" variant="h2" align="left">Ready to play?</Typography>
         <input type="text" className="search-bar" placeholder="Paste URL here" onChange={(e) => { getURLInfo(e.target.value) }}/>
         <span className="btn-progress">
           <Button onClick={handleSubmit} px="45px" variant="contained" color="primary">Go</Button>
@@ -114,7 +114,7 @@ function Player({folder, show}) {
     <div className='player'>
       <StemGroup folder={folder} playing={playing} setReadyToPlay={setReadyToPlay} />
       <div className='play-btn'>
-        <PlayPauseButton onClick={() => {setPlaying(!playing)}} playing={playing} disabled={!readyToPlay} > Play/Pause </PlayPauseButton>
+        <PlayPauseButton onClick={() => {setPlaying(!playing)}} playing={playing} disabled={false} > Play/Pause </PlayPauseButton>
       </div>
     </div>
     :

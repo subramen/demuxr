@@ -14,21 +14,23 @@ html, body {
 .wrapper {
     display: grid;
     gap: 20px;
-    grid-template-columns: repeat(12, [col-start] 1fr);
-}
-
-.wrapper > * {
-    grid-column: col-start / span 12;
+    grid-template-areas:
+      "user-input"
+      "player"
+      "sidebar"
+      "ad"
+      "footer";
 }
 
 .user-input {
     display: grid;
-    grid-template-rows: repeat(3, minmax(100px, 1fr));
-    gap: 20px;
+    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-rows: 1fr 1fr 1fr;
+    gap: 0px 0px;
     grid-template-areas:
-        "prompt"
-        "search-bar"
-        "btn-progress";
+        "prompt prompt ."
+        "search-bar . ."
+        "btn-progress . .";
     grid-area: user-input;
 }
     .prompt { grid-area: prompt; }
@@ -38,9 +40,8 @@ html, body {
         grid-area: btn-progress;
         grid-template-columns: 1fr 1fr;
         grid-template-rows: auto 1fr ;
-        gap: 20px;
+        gap: 20px 0px;
         justify-self: center;
-        justify-items: center;
     }
 
     .search-bar {
@@ -71,8 +72,7 @@ html, body {
         display: grid;
         grid-area: stemgroup;
         gap: 20px;
-        grid-template-columns: repeat(5,minmax(50px, 1fr));
-        align-content: center;
+        grid-template-columns: repeat(5,minmax(50px, 150px));;
     }
 
         .stem {
@@ -83,49 +83,13 @@ html, body {
         }
 
         .stem-slider {
-            height: 20vh;
+            height: 30vh;
         }
         
-        .play-btn {
-            grid-area: play-btn;
-        }
 
-        .MuiIconButton-root {
-            font-size: 4.5rem!important;
-        }
-
-
-    @media (min-width: 200px) {
-        .user-input {
-            grid-column: col-start 2 / 12;
-            grid-row: 2;
-        }
-        .player {
-            grid-column: col-start 2 / 12;
-            grid-row: 3;
-            }
-        .ad {
-            grid-row: 4;
-        }
-        .footer {
-            grid-row: 5;
-        } 
+    .MuiIconButton-root {
+    font-size: 4.5rem!important;
     }
-    
 
-    @media (min-width: 520px) {
-        .user-input {
-          grid-column: col-start 4 / span 6;
-          grid-row: 2;
-        }
-        .player {
-            grid-column: col-start 3 / 11;
-            grid-row: 3;
-          }
-        .ad {
-            grid-row: 4;
-        }
-        .footer {
-            grid-row: 5;
-        } 
-      }
+
+
