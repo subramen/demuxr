@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import ReactPlayer from 'react-player/file'
 import { styled } from "@material-ui/core/styles";
 import { spacing } from "@material-ui/system";
@@ -59,10 +59,7 @@ function App() {
     <div className='App'>
       <div className="wrapper">
         <UserInput getURLInfo={getURLInfo} runInference={runInference} />
-        {/* <Player folder={urlData['folder']} demuxComplete={demuxComplete} />  */}
-        <Player folder="http://demucs-app-cache.s3.amazonaws.com/0UHwkfhwjsk" demuxComplete={true} /> 
-        
-        <aside className="sidebar">Sidebar</aside>
+        <Player folder={urlData['folder']} demuxComplete={demuxComplete} /> 
         <footer className="footer">Made with &#127927; by @subramen</footer>
         
       </div>
@@ -99,14 +96,13 @@ function Player({folder, demuxComplete}) {
     'other': useRef(),
     'vocals': useRef()
   };
-
-  const [readyCount, setReadyCount] = useState(0);
+  const [playEnabled, setPlayEnabled] = useState(false)
   
+  const readyCountRef = useRef(0);
   const handleReady = () => {
-    setReadyCount(readyCount + 1);
-    if (readyCount === stems.length) {
-      console.log('ready to play!')
-    }
+    readyCountRef.current += 1;
+    console.log("ready ", readyCountRef.current, stems.length);
+    if (readyCountRef.current == stems.length) setPlayEnabled(true);
   };
 
   const handlePlayPause = () => {
@@ -114,21 +110,30 @@ function Player({folder, demuxComplete}) {
     Object.values(stemRefs).map(ref => ref.current.playPause());
   }
 
+  const handleSeek = (seek) => {
+    for (const [key, value] of Object.entries(stemRefs)) {
+      if (key !== 'original' && value.current){
+        value.current.seekTo(seek);
+      }
+    }
+  }
+
   return (
     <div className='player'>
-      <Stem  folder={folder} id="original" onReady={handleReady} demuxComplete={demuxComplete} wavesurferRef={stemRefs['original']} />
+      <Stem  folder={folder} id="original" onReady={handleReady} demuxComplete={demuxComplete} wavesurferRef={stemRefs['original']} handleSeek={handleSeek} />
       {demuxComplete ? 
         <div className='stemgroup'>
-          <Stem folder={folder} id='bass'  onReady={handleReady} demuxComplete={demuxComplete} wavesurferRef={stemRefs['bass']}/>
-          <Stem folder={folder} id='drums'  onReady={handleReady} demuxComplete={demuxComplete} wavesurferRef={stemRefs['drums']} />
-          <Stem folder={folder} id='other'  onReady={handleReady} demuxComplete={demuxComplete} wavesurferRef={stemRefs['other']} />
-          <Stem folder={folder} id='vocals'  onReady={handleReady} demuxComplete={demuxComplete} wavesurferRef={stemRefs['vocals']} />
+          <Stem folder={folder} id='bass'  onReady={handleReady} demuxComplete={demuxComplete} wavesurferRef={stemRefs['bass']} handleSeek={()=>{}}/>
+          <Stem folder={folder} id='drums'  onReady={handleReady} demuxComplete={demuxComplete} wavesurferRef={stemRefs['drums']} handleSeek={()=>{}}/>
+          <Stem folder={folder} id='other'  onReady={handleReady} demuxComplete={demuxComplete} wavesurferRef={stemRefs['other']} handleSeek={()=>{}}/>
+          <Stem folder={folder} id='vocals'  onReady={handleReady} demuxComplete={demuxComplete} wavesurferRef={stemRefs['vocals']} handleSeek={()=>{}}/>
         </div>
         : null}
-      <div className='play-btn'>
+      <div className='play-btn'>  
         <PlayPauseButton 
           onClick={handlePlayPause} 
-          disabled={false}> 
+          disabled={!playEnabled}
+        > 
           Play/Pause 
         </PlayPauseButton>
       </div>
@@ -138,7 +143,7 @@ function Player({folder, demuxComplete}) {
 
 
 function Stem(props) {
-  const {folder, id, onReady, demuxComplete, wavesurferRef} = props;
+  const {folder, id, onReady, demuxComplete, wavesurferRef, handleSeek} = props;
   const url = folder + '/' + id + '.mp3';
 
   return (
@@ -150,6 +155,7 @@ function Stem(props) {
         onReady={onReady}
         demuxComplete={demuxComplete}
         wavesurferRef={wavesurferRef}
+        handleSeek={handleSeek}
       />
       <div className='stem-slider'>
         <Slider

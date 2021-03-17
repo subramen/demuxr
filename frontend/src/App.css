@@ -71,16 +71,16 @@ html, body {
         "play-btn";
 }
     
-    #original {
-        grid-area: loading-stem;
-    }
-
     .stem {
         display: flex;
         flex-direction: column;
         justify-content: space-between;
     }
 
+    #original {
+        grid-area: loading-stem;
+    }
+    
     .stem-slider {
         align-self: center;
         width: 20vw;

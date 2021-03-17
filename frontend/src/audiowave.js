@@ -9,8 +9,8 @@ import React, {
   import TimelinePlugin from "wavesurfer.js/dist/plugin/wavesurfer.timeline.min";
   
   
-  export default function AudioWave( {url, id, demuxComplete, onReady, wavesurferRef} ) {
-    const buffer = 1200;
+  export default function AudioWave( {url, id, demuxComplete, onReady, wavesurferRef, handleSeek} ) {
+    const buffer = 600;
     const [timelineVis, setTimelineVis] = useState(true);
     const [songLength, setSongLength] = useState(0);
   
@@ -56,9 +56,11 @@ import React, {
             wavesurferRef.current.setVolume(0.8);
           });
   
-        //   wavesurferRef.current.on("loading", data => {
-        //     console.log("loading --> ", data);
-        //   });
+          wavesurferRef.current.on("seek", data => {
+            if (handleSeek !== undefined) {
+                handleSeek(data);
+            }
+          });
   
           if (window) {
             window.surferidze = wavesurferRef.current;
@@ -73,12 +75,10 @@ import React, {
       const timer = songLength && setInterval(() => {
         setProgress(progress + 1);
         wavesurferRef.current.seekTo(progress/songLength);
-        console.log('tick', progress, progress/songLength);
       }, buffer);
       
       if (progress > songLength || demuxComplete) {
         clearInterval(timer);
-        console.log('go blue', progress, songLength);
         let elt =  wavesurferRef.current;
         elt.seekTo(0);
         elt.setWaveColor('#637bc1');
@@ -86,17 +86,6 @@ import React, {
       }
       return () => clearInterval(timer);
     });
-  
-    
-    // useEffect(() => {
-    //   playing ? wavesurferRef.current.play() : wavesurferRef.current.pause(); 
-    // }, [playing]);
-  
-    // useEffect(() => {
-    //     wavesurferRef.current.setVolume(volume);
-    //     wavesurferRef.current.setHeight(1 + volume*128);
-    // }, [volume]);
-    
     
     return (
         <WaveSurfer plugins={plugins} onMount={handleWSMount}>
