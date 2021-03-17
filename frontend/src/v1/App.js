@@ -7,7 +7,7 @@ import { LinearProgress, IconButton, Typography, Slider, CircularProgress } from
 import PauseCircleFilledIcon from '@material-ui/icons/PauseCircleFilled';
 import PlayCircleFilledIcon from '@material-ui/icons/PlayCircleFilled';
 import './App.css'
-import AudioWave from "./audiowave"
+// import AudioWave from "./audiowave"
 
 const API_BASE_URL = '/api/'
 // const API_BASE_URL = 'http://localhost:5000/api/'
@@ -16,9 +16,9 @@ const Button = styled(MuiButton)(spacing)
 function App() {
   const [url, setURL] = useState('');
   const [urlData, setUrlData] = useState({});
-  const [demuxComplete, setDemuxComplete] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [inferHTTP, setInferHTTP] = useState(0);
-  // const [inferMsg, setInferMsg] = useState('');
+  const [inferMsg, setInferMsg] = useState('');
 
   function getURLInfo(url) {
     setURL(url);
@@ -29,6 +29,7 @@ function App() {
         .then(response => response.json())
         .then(data => {
           setUrlData(data);
+          console.log(data);
         })
         .catch(error => console.error(error));
     }
@@ -40,30 +41,29 @@ function App() {
     
     console.log('running inference for url', url);
     var infer_api_str = API_BASE_URL + "demux?url=" + url;
-    setDemuxComplete(false);
+    setLoading(true);
 
     fetch(infer_api_str)
       .then(res => res.json())
       .then(data => {
-        // setInferMsg(data['msg']);
+        setInferMsg(data['msg']);
         setInferHTTP(data['status']);
-        setDemuxComplete(true);
+        setLoading(false);
         console.log("inferMsg: ", inferMsg);
         console.log("inferHTTP: ", inferHTTP);})
       .catch(error => { 
         console.error(error);
-        setDemuxComplete(false);
+        setLoading(false);
       });
   }
 
   return (
     <div className='App'>
       <div className="wrapper">
-        <UserInput getURLInfo={getURLInfo} runInference={runInference} />
-        {/* <Player folder={urlData['folder']} demuxComplete={demuxComplete} />  */}
-        <Player folder="http://demucs-app-cache.s3.amazonaws.com/0UHwkfhwjsk" demuxComplete={false} /> 
-        
+        <UserInput getURLInfo={getURLInfo} runInference={runInference} loading={true/*loading*/} eta={300/*urlData['eta']*/}/>
+        <Player folder={inferMsg} show={true /*inferHTTP === 200*/}/>
         <aside className="sidebar">Sidebar</aside>
+        {/* <div className="ad">Some ad</div> */}
         <footer className="footer">Made with &#127927; by @subramen</footer>
       </div>
     </div>
@@ -71,7 +71,7 @@ function App() {
 }
 
 
-function UserInput({ getURLInfo, runInference}) {
+function UserInput({ getURLInfo, runInference, loading, eta }) {
   const handleSubmit = (e) => {
     e.preventDefault();
     setTimeout(runInference, 1000);
@@ -80,21 +80,53 @@ function UserInput({ getURLInfo, runInference}) {
   return (
     <div className="user-input">
       <Typography className="prompt" variant="h2" align="left">Ready to play?</Typography>
-        <input type="text" className="search-bar" placeholder="Paste URL here" 
-        onChange={(e) => { getURLInfo(e.target.value) }}/>
+        <input type="text" className="search-bar" placeholder="Paste URL here" onChange={(e) => { getURLInfo(e.target.value) }}/>
         <span className="btn-progress">
           <Button onClick={handleSubmit} px="45px" variant="contained" color="primary">Go</Button>
+          <TimedProgress loading={loading} eta={eta} />
         </span>
     </div>
   );
 }
-    
 
-function Player({folder, demuxComplete}) {
-  const stems = ['original', 'bass', 'drums', 'other', 'vocals'];
-  const [playing, setPlaying] = useState(false);
-  const [readyCount, setReadyCount] = useState(0);
+const TimedProgress = ({ loading, eta }) => {
+  // FAQ No. 3 https://wavesurfer-js.org/faq/
+
+  const [secElapsed, setSecElapsed] = useState(0)
+  const [progress, setProgress] = useState(0);
   
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setSecElapsed(secElapsed + 1);
+      setProgress(oldProgress => oldProgress >= 100 ? 0 : Math.floor(secElapsed * 100 / eta));
+    }, 1000);
+    console.log(secElapsed, progress);  
+    return () => clearInterval(timer);
+  });
+
+  return ( loading ?     
+      <CircularProgress variant="determinate" size={60} thickness={5} value={progress}/>
+      : null);
+};
+
+function Player({folder, show}) {
+  const [playing, setPlaying] = useState(false);
+
+  return ( show ?
+    <div className='player'>
+      <StemGroup folder={folder} playing={playing} />
+      <div className='play-btn'>
+        <PlayPauseButton onClick={() => {setPlaying(!playing)}} playing={playing} disabled={false} > Play/Pause </PlayPauseButton>
+      </div>
+    </div>
+    :
+    null
+  );
+}
+
+function StemGroup({folder, playing}) {
+  const stems = ['bass', 'drums', 'other', 'vocals'];
+  const [readyCount, setReadyCount] = useState(0);
   const handleReady = () => {
     setReadyCount(readyCount + 1);
     if (readyCount === stems.length) {
@@ -103,48 +135,53 @@ function Player({folder, demuxComplete}) {
   };
 
   return (
-    <div className='player'>
-      <Stem playing={playing} folder={folder} stem='original' onReady={handleReady} demuxComplete={demuxComplete} />
-      <div className='stemgroup'>
-        {demuxComplete ? 
-        stems.map(stem => 
-          <Stem folder={folder} stem={stem} playing={playing} onReady={handleReady} demuxComplete={demuxComplete}/>)
-        : null}
-      </div>
-      <div className='play-btn'>
-        <PlayPauseButton 
-          onClick={() => {setPlaying(!playing)}} 
-          playing={playing} 
-          disabled={readyCount < stems.length}> 
-          Play/Pause 
-        </PlayPauseButton>
-      </div>
+    <div className='stemgroup'>
+        {stems.map(stem => <Stem folder={folder} playing={playing} stem={stem} key={stem} onReady={handleReady}/>)}
     </div>
   );
 }
 
-
 function Stem(props) {
-  const {folder, stem, playing, onReady, demuxComplete} = props;
+  const {folder, stem, playing, onReady} = props;
+  const [muted, setMute] = useState(false);
   const [volume, setVolume] = useState(0.8);
   const url = folder + '/' + stem + '.mp3';
 
+  const toggleStem = () => {
+    console.log('toggling ', stem, 'from ', muted, 'to ', !muted);
+    setMute(!muted); };
+
+  const handleVolumeChange = (e, v) => {
+    setVolume(v);
+  }
+
   return (
     <div className={'stem ' + stem}>
-      <Typography id="label" align="center">{stem}</Typography>
-      <AudioWave
-        url={url}
-        volume={volume}
-        playing={playing}
-        onReady={onReady}
-        demuxComplete={demuxComplete}
-      />
+      <div className='stem-title'>
+        <ReactPlayer
+          width='0px'
+          height='0px'
+          url={url}
+          playing={playing}
+          muted={muted}
+          volume={volume}
+          onReady={onReady}
+          onStart={() => console.log(stem, 'Start')}
+          onPause={() => console.log(stem, 'Pause')}
+          onBuffer={() => console.log(stem, 'onBuffer')}
+          onSeek={e => console.log('onSeek', e)}
+          onError={e => console.log('onError', e)}
+        />
+        <Typography id="label" align="center">{stem}</Typography>
+      </div>
       <div className='stem-slider'>
         <Slider
+          orientation="vertical"
           min={0} max={1}
           step={0.01}
           value={volume}
-          onChange={(e,v) => setVolume(v)}
+          scale={x => x*100}
+          onChange={handleVolumeChange}
           color="primary"
           aria-labelledby="label"
         />

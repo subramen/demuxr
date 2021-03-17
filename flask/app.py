@@ -40,7 +40,8 @@ class S3Helper:
         return True
 
     # upload to s3
-    def _upload_file(self, bytes_like, object_name):
+    def upload_file(self, bytes_like, name):
+        object_name = self.folder + '/' + name + '.mp3'
         s3_client = boto3.client('s3')
         logger.debug(f'Uploading {object_name}')
         s3_client.upload_fileobj(
@@ -67,19 +68,19 @@ class S3Helper:
         if not self.folder:
             raise ValueError('video id not initialized')
         for name, byt in stem_bytes.items():
-            obj_name = self.folder + '/' + name + '.mp3'
-            self._upload_file(byt, obj_name)
+            if name == 'original': continue  # original is already uploaded
+            self.upload_file(byt, name)
 
 
    
 # get ETA + other things
 def get_video_info(url):
-    info_dict = youtubedl(url, False)
+    info_dict = youtubedl(url, True)
     response = {
         'url': url,
         'title': info_dict['title'],
         'id': info_dict['id'],
-        'eta': info_dict['duration'] + 120, # add 2 minutes buffer
+        'folder': S3Helper(info_dict['id']).get_access_point()
     }
     logger.info(response)
     return response
@@ -88,7 +89,7 @@ def get_video_info(url):
 # get the youtube info_dict
 def youtubedl(url, download=True):
     logger.debug(f"Running youtube-dl for {url}")
-    temp = tempfile.TemporaryDirectory()
+    temp = tempfile.TemporaryDirectory() # TODO: Use as context manager 
     ydl_opts = {
         'quiet':True,
         'outtmpl':f'{temp.name}/%(id)s/original.%(ext)s',
@@ -104,6 +105,7 @@ def youtubedl(url, download=True):
         if download:
             out_file = Path(temp.name) / info_dict['id'] / 'original.mp3'
             info_dict['mp3_bytes'] = open(out_file, 'rb').read()
+            S3Helper(info_dict['id']).upload_file(info_dict['mp3_bytes'], 'original')
     
     return info_dict
 
@@ -153,10 +155,10 @@ def validate_url(url):
     return True, (200, 'OK')
 
 
-@app.route("/api/playlist")
-@cross_origin()
-def get_cached():
-    ids = S3Helper().get_filelist()
+# @app.route("/api/playlist")
+# @cross_origin()
+# def get_cached():
+#     ids = S3Helper().get_filelist()
     
 
 
@@ -167,6 +169,7 @@ def info():
     url = request.args.get('url')
     logger.info(f'Pinging /api/info with param = {url}')
     return get_video_info(url)
+
 
 
 @app.route("/api/demux")

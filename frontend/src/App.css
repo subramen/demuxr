@@ -71,7 +71,8 @@ html, body {
         display: grid;
         grid-area: stemgroup;
         gap: 20px;
-        grid-template-columns: repeat(5,minmax(50px, 1fr));
+        grid-template-rows: repeat(2,minmax(100px, 1fr));
+        grid-template-columns: repeat(2,minmax(100px, 1fr));
         align-content: center;
     }
 
@@ -83,7 +84,7 @@ html, body {
         }
 
         .stem-slider {
-            height: 20vh;
+            width: 20vw;
         }
         
         .play-btn {
