@@ -9,12 +9,13 @@ import React, {
   import TimelinePlugin from "wavesurfer.js/dist/plugin/wavesurfer.timeline.min";
   
   
-  export default function AudioWave( {url, audio, demuxComplete, playing, volume, onReady} ) {
+  export default function AudioWave( {url, id, demuxComplete, onReady, wavesurferRef} ) {
     const buffer = 1200;
     const [timelineVis, setTimelineVis] = useState(true);
     const [songLength, setSongLength] = useState(0);
   
     const wfOpts = {
+      id: id + "-waveform",
       barGap: 6,
       barWidth: 3,
       barHeight: 0.7,
@@ -29,41 +30,35 @@ import React, {
         timelineVis && {
           plugin: TimelinePlugin,
           options: {
-            container: "#timeline"
+            container: "#timeline",
+            primaryColor: 'white',
+            secondaryColor: 'grey',
+            primaryFontColor: 'white',
+            secondaryFontColor: 'white',
           }
         }
       ].filter(Boolean);
     }, [timelineVis]);
   
-  
-    const toggleTimeline = useCallback(() => {
-      setTimelineVis(!timelineVis);
-    }, [timelineVis]);
-  
     const [progress, setProgress] = useState(0);
-  
-    const wavesurferRef = useRef();
   
     const handleWSMount = useCallback(
       waveSurfer => {
         wavesurferRef.current = waveSurfer;
         if (wavesurferRef.current) {
-          if (url) {
-              wavesurferRef.current.load(url);
-          }
-          else if (audio){
-            wavesurferRef.current.load(url);
-          }
-  
+          wavesurferRef.current.load(url);
+          console.log("Loaded url for ", id);
+
           wavesurferRef.current.on("ready", () => {
-            console.log("WaveSurfer is ready");
+            console.log("WaveSurfer is ready for ", id);
             setSongLength(wavesurferRef.current.getDuration());
             onReady();
+            wavesurferRef.current.setVolume(0.8);
           });
   
-          wavesurferRef.current.on("loading", data => {
-            console.log("loading --> ", data);
-          });
+        //   wavesurferRef.current.on("loading", data => {
+        //     console.log("loading --> ", data);
+        //   });
   
           if (window) {
             window.surferidze = wavesurferRef.current;
@@ -73,14 +68,6 @@ import React, {
       []
     );
   
-    
-    const readyToPlay = useCallback(() => {
-      let elt =  wavesurferRef.current;
-      elt.seekTo(0);
-      elt.setWaveColor('#637bc1');
-      elt.setProgressColor('#1c36c9');
-    }, []);
-  
   
     useEffect(() => {
       const timer = songLength && setInterval(() => {
@@ -89,32 +76,31 @@ import React, {
         console.log('tick', progress, progress/songLength);
       }, buffer);
       
-      if (progress >= 15 || demuxComplete) {
+      if (progress > songLength || demuxComplete) {
         clearInterval(timer);
-        readyToPlay();
+        console.log('go blue', progress, songLength);
+        let elt =  wavesurferRef.current;
+        elt.seekTo(0);
+        elt.setWaveColor('#637bc1');
+        elt.setProgressColor('#1c36c9');
       }
       return () => clearInterval(timer);
     });
   
     
-    useEffect(() => {
-      playing ? wavesurferRef.current.play() : wavesurferRef.current.pause();  
-    }, [playing]);
+    // useEffect(() => {
+    //   playing ? wavesurferRef.current.play() : wavesurferRef.current.pause(); 
+    // }, [playing]);
   
     // useEffect(() => {
-    //   playing ? wavesurferRef.current.setMute(true) : wavesurferRef.current.setMute(false);  
-    // }, [muted]);
-  
-    useEffect(() => {
-        wavesurferRef.current.setVolume(volume);
-        wavesurferRef.current.setHeight(volume);
-    }, [volume]);
-        
-  
-  
+    //     wavesurferRef.current.setVolume(volume);
+    //     wavesurferRef.current.setHeight(1 + volume*128);
+    // }, [volume]);
+    
+    
     return (
         <WaveSurfer plugins={plugins} onMount={handleWSMount}>
-            <WaveForm id="original-waveform" {...wfOpts}/>
+            <WaveForm {...wfOpts}/>
             <div id="timeline" />
         </WaveSurfer>
     );

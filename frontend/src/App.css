@@ -62,38 +62,50 @@ html, body {
 .player { 
     display: grid;
     grid-area: player; 
+    gap: 60px;
+    grid-column-gap: 120px;
+    grid-template-rows: 1fr auto auto;
     grid-template-areas:
+        "loading-stem"
         "stemgroup"
         "play-btn";
 }
+    
+    #original {
+        grid-area: loading-stem;
+    }
+
+    .stem {
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+
+    .stem-slider {
+        align-self: center;
+        width: 20vw;
+    }
 
     .stemgroup {
         display: grid;
         grid-area: stemgroup;
-        gap: 20px;
-        grid-template-rows: repeat(2,minmax(100px, 1fr));
+        gap: 40px;
+        grid-template-rows: repeat(2,minmax(150px, 1fr));
         grid-template-columns: repeat(2,minmax(100px, 1fr));
         align-content: center;
     }
-
-        .stem {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: space-between;
-        }
-
-        .stem-slider {
-            width: 20vw;
-        }
         
-        .play-btn {
-            grid-area: play-btn;
-        }
+    .play-btn {
+        grid-area: play-btn;
+    }
 
-        .MuiIconButton-root {
-            font-size: 4.5rem!important;
-        }
+    .MuiIconButton-root {
+        font-size: 4.5rem!important;
+    }
+
+    #stem-label {
+        grid-area: stemtitle;
+    }
 
 
     @media (min-width: 200px) {

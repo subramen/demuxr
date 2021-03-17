@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import ReactPlayer from 'react-player/file'
 import { styled } from "@material-ui/core/styles";
 import { spacing } from "@material-ui/system";
@@ -45,7 +45,6 @@ function App() {
     fetch(infer_api_str)
       .then(res => res.json())
       .then(data => {
-        // setInferMsg(data['msg']);
         setInferHTTP(data['status']);
         setDemuxComplete(true);
         console.log("inferMsg: ", inferMsg);
@@ -61,10 +60,11 @@ function App() {
       <div className="wrapper">
         <UserInput getURLInfo={getURLInfo} runInference={runInference} />
         {/* <Player folder={urlData['folder']} demuxComplete={demuxComplete} />  */}
-        <Player folder="http://demucs-app-cache.s3.amazonaws.com/0UHwkfhwjsk" demuxComplete={false} /> 
+        <Player folder="http://demucs-app-cache.s3.amazonaws.com/0UHwkfhwjsk" demuxComplete={true} /> 
         
         <aside className="sidebar">Sidebar</aside>
         <footer className="footer">Made with &#127927; by @subramen</footer>
+        
       </div>
     </div>
   );
@@ -92,7 +92,14 @@ function UserInput({ getURLInfo, runInference}) {
 
 function Player({folder, demuxComplete}) {
   const stems = ['original', 'bass', 'drums', 'other', 'vocals'];
-  const [playing, setPlaying] = useState(false);
+  const stemRefs = {
+    'original': useRef(),
+    'bass': useRef(),
+    'drums': useRef(),
+    'other': useRef(),
+    'vocals': useRef()
+  };
+
   const [readyCount, setReadyCount] = useState(0);
   
   const handleReady = () => {
@@ -102,20 +109,26 @@ function Player({folder, demuxComplete}) {
     }
   };
 
+  const handlePlayPause = () => {
+    console.log("play/pause");
+    Object.values(stemRefs).map(ref => ref.current.playPause());
+  }
+
   return (
     <div className='player'>
-      <Stem playing={playing} folder={folder} stem='original' onReady={handleReady} demuxComplete={demuxComplete} />
-      <div className='stemgroup'>
-        {demuxComplete ? 
-        stems.map(stem => 
-          <Stem folder={folder} stem={stem} playing={playing} onReady={handleReady} demuxComplete={demuxComplete}/>)
+      <Stem  folder={folder} id="original" onReady={handleReady} demuxComplete={demuxComplete} wavesurferRef={stemRefs['original']} />
+      {demuxComplete ? 
+        <div className='stemgroup'>
+          <Stem folder={folder} id='bass'  onReady={handleReady} demuxComplete={demuxComplete} wavesurferRef={stemRefs['bass']}/>
+          <Stem folder={folder} id='drums'  onReady={handleReady} demuxComplete={demuxComplete} wavesurferRef={stemRefs['drums']} />
+          <Stem folder={folder} id='other'  onReady={handleReady} demuxComplete={demuxComplete} wavesurferRef={stemRefs['other']} />
+          <Stem folder={folder} id='vocals'  onReady={handleReady} demuxComplete={demuxComplete} wavesurferRef={stemRefs['vocals']} />
+        </div>
         : null}
-      </div>
       <div className='play-btn'>
         <PlayPauseButton 
-          onClick={() => {setPlaying(!playing)}} 
-          playing={playing} 
-          disabled={readyCount < stems.length}> 
+          onClick={handlePlayPause} 
+          disabled={false}> 
           Play/Pause 
         </PlayPauseButton>
       </div>
@@ -125,26 +138,25 @@ function Player({folder, demuxComplete}) {
 
 
 function Stem(props) {
-  const {folder, stem, playing, onReady, demuxComplete} = props;
-  const [volume, setVolume] = useState(0.8);
-  const url = folder + '/' + stem + '.mp3';
+  const {folder, id, onReady, demuxComplete, wavesurferRef} = props;
+  const url = folder + '/' + id + '.mp3';
 
   return (
-    <div className={'stem ' + stem}>
-      <Typography id="label" align="center">{stem}</Typography>
+    <div className={'stem ' + id}>
+      <Typography id="stem-label" align="center">{id}</Typography>
       <AudioWave
         url={url}
-        volume={volume}
-        playing={playing}
+        id={id}
         onReady={onReady}
         demuxComplete={demuxComplete}
+        wavesurferRef={wavesurferRef}
       />
       <div className='stem-slider'>
         <Slider
           min={0} max={1}
           step={0.01}
-          value={volume}
-          onChange={(e,v) => setVolume(v)}
+          defaultValue={0.8}
+          onChange={(e,v) => wavesurferRef.current.setVolume(v)}
           color="primary"
           aria-labelledby="label"
         />
@@ -154,10 +166,12 @@ function Stem(props) {
 }
 
 function PlayPauseButton(props) {
-  const {onClick, playing, disabled} = props;
+  const {onClick, disabled} = props;
+  const [playing, setPlaying] = useState(false);
+
   const play_pause = playing ?  <PauseCircleFilledIcon fontSize="inherit"/> : <PlayCircleFilledIcon fontSize="inherit"/>
   return (
-    <IconButton color="primary" aria-label="play/pause" onClick={onClick} disabled={disabled}>
+    <IconButton color="primary" aria-label="play/pause" onClick={() => {onClick(); setPlaying(!playing)}} disabled={disabled}>
       {play_pause}
     </IconButton>
   );
