@@ -10,7 +10,7 @@ import React, {
   
   
   export default function AudioWave( {url, id, demuxComplete, onReady, wavesurferRef, handleSeek} ) {
-    const buffer = 600;
+    const buffer = 1200;
     const [timelineVis, setTimelineVis] = useState(true);
     const [songLength, setSongLength] = useState(0);
   

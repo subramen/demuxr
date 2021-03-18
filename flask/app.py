@@ -105,7 +105,9 @@ def youtubedl(url, download=True):
         if download:
             out_file = Path(temp.name) / info_dict['id'] / 'original.mp3'
             info_dict['mp3_bytes'] = open(out_file, 'rb').read()
-            S3Helper(info_dict['id']).upload_file(info_dict['mp3_bytes'], 'original')
+            if not info_dict['id'] in S3Helper().get_filelist():
+                logger.info("New track! Uploading original to S3")
+                S3Helper(info_dict['id']).upload_file(info_dict['mp3_bytes'], 'original')
     
     return info_dict
 
@@ -147,21 +149,13 @@ def run_inference(mp3_bytes):
         raise RuntimeError("Torchserve inference failed!")
 
 
-def validate_url(url):
-    info = get_video_info(url)
-    if info['eta'] > MAX_AUDIO_DURATION:
-        logger.error("URL Validation Failed! Video is too long")
-        return False, (413, 'Video too long')
-    return True, (200, 'OK')
-
-
-# @app.route("/api/playlist")
-# @cross_origin()
-# def get_cached():
-#     ids = S3Helper().get_filelist()
+# def validate_url(url):
+#     info = get_video_info(url)
+#     if info['eta'] > MAX_AUDIO_DURATION:
+#         logger.error("URL Validation Failed! Video is too long")
+#         return False, (413, 'Video too long')
+#     return True, (200, 'OK')
     
-
-
 
 @app.route("/api/info")
 @cross_origin()
@@ -179,11 +173,11 @@ def main():
     url = request.args.get('url')
     logger.info(f'Pinging /api/demux with param = {url}')
 
-    is_valid, status = validate_url(url)
-    if not is_valid:
-        response['status'], response['msg'] = status
-        logger.error("Video is invalid!", response)
-        return response
+    # is_valid, status = validate_url(url)
+    # if not is_valid:
+    #     response['status'], response['msg'] = status
+    #     logger.error("Video is invalid!", response)
+    #     return response
 
     info_dict = youtubedl(url)
     s3 = S3Helper(info_dict['id'])

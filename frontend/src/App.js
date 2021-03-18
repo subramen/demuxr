@@ -9,7 +9,7 @@ import PlayCircleFilledIcon from '@material-ui/icons/PlayCircleFilled';
 import './App.css'
 import AudioWave from "./audiowave"
 
-const API_BASE_URL = '/api/'
+const API_BASE_URL = 'http://18.232.77.24:5000/api/'
 const Button = styled(MuiButton)(spacing)
 
 function App() {
@@ -27,6 +27,7 @@ function App() {
         .then(response => response.json())
         .then(data => {
           setUrlData(data);
+          console.log(urlData);
         })
         .catch(error => console.error(error));
     }
@@ -36,10 +37,10 @@ function App() {
   function runInference() {
     if (!urlData) getURLInfo(url);
     
-    console.log('running inference for url', url);
     var infer_api_str = API_BASE_URL + "demux?url=" + url;
     setDemuxComplete(false);
-
+    
+    console.log('running inference for url', url);
     fetch(infer_api_str)
       .then(res => res.json())
       .then(data => {
@@ -89,6 +90,8 @@ function UserInput({ getURLInfo, runInference}) {
     
 
 function Player({folder, demuxComplete}) {
+  console.log("<Player> ", folder, demuxComplete);
+
   const stems = ['original', 'bass', 'drums', 'other', 'vocals'];
   const stemRefs = {
     'original': useRef(),
