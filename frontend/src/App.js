@@ -10,7 +10,6 @@ import './App.css'
 import AudioWave from "./audiowave"
 
 const API_BASE_URL = '/api/'
-// const API_BASE_URL = 'http://localhost:5000/api/'
 const Button = styled(MuiButton)(spacing)
 
 function App() {
@@ -18,7 +17,6 @@ function App() {
   const [urlData, setUrlData] = useState({});
   const [demuxComplete, setDemuxComplete] = useState(false);
   const [inferHTTP, setInferHTTP] = useState(0);
-  // const [inferMsg, setInferMsg] = useState('');
 
   function getURLInfo(url) {
     setURL(url);
@@ -60,8 +58,11 @@ function App() {
       <div className="wrapper">
         <UserInput getURLInfo={getURLInfo} runInference={runInference} />
         <Player folder={urlData['folder']} demuxComplete={demuxComplete} /> 
-        <footer className="footer">Made with &#127927; by @subramen</footer>
-        
+        <footer className="footer">
+          <Typography variant="h6"> 
+            Made with &#127927; by <a href="https://twitter.com/subramen">@subramen</a>
+          </Typography>
+        </footer>
       </div>
     </div>
   );
@@ -120,7 +121,10 @@ function Player({folder, demuxComplete}) {
 
   return (
     <div className='player'>
+      {folder ?
       <Stem  folder={folder} id="original" onReady={handleReady} demuxComplete={demuxComplete} wavesurferRef={stemRefs['original']} handleSeek={handleSeek} />
+      : null}
+
       {demuxComplete ? 
         <div className='stemgroup'>
           <Stem folder={folder} id='bass'  onReady={handleReady} demuxComplete={demuxComplete} wavesurferRef={stemRefs['bass']} handleSeek={()=>{}}/>
@@ -129,6 +133,7 @@ function Player({folder, demuxComplete}) {
           <Stem folder={folder} id='vocals'  onReady={handleReady} demuxComplete={demuxComplete} wavesurferRef={stemRefs['vocals']} handleSeek={()=>{}}/>
         </div>
         : null}
+
       <div className='play-btn'>  
         <PlayPauseButton 
           onClick={handlePlayPause} 
@@ -148,7 +153,7 @@ function Stem(props) {
 
   return (
     <div className={'stem ' + id}>
-      <Typography id="stem-label" align="center">{id}</Typography>
+      <Typography id="stem-label" align="center" variant="h6">{id}</Typography>
       <AudioWave
         url={url}
         id={id}

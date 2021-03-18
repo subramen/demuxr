@@ -36,8 +36,8 @@ html, body {
     .btn-progress {
         display: grid;
         grid-area: btn-progress;
-        grid-template-columns: 1fr 1fr;
-        grid-template-rows: auto 1fr ;
+        /* grid-template-columns: 1fr 1fr; */
+        grid-template-rows: 42px ;
         gap: 20px;
         justify-self: center;
         justify-items: center;
