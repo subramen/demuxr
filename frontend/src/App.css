@@ -10,7 +10,6 @@ html, body {
     color: white;
 }
  
-/* mobile layout */
 .wrapper {
     display: grid;
     gap: 20px;
@@ -23,20 +22,22 @@ html, body {
 
 .user-input {
     display: grid;
-    grid-template-rows: repeat(3, minmax(100px, 1fr));
+    grid-template-rows: repeat(4, minmax(100px, 1fr));
     gap: 20px;
     grid-template-areas:
         "prompt"
         "search-bar"
-        "btn-progress";
+        "btn-progress"
+        "status";
     grid-area: user-input;
 }
     .prompt { grid-area: prompt; }
 
+    .status { grid-area: status;}
+
     .btn-progress {
         display: grid;
         grid-area: btn-progress;
-        /* grid-template-columns: 1fr 1fr; */
         grid-template-rows: 42px ;
         gap: 20px;
         justify-self: center;
@@ -131,6 +132,7 @@ html, body {
           grid-column: col-start 4 / span 6;
           grid-row: 2;
         }
+
         .player {
             grid-column: col-start 3 / 11;
             grid-row: 3;

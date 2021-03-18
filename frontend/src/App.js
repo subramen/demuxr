@@ -10,55 +10,62 @@ import './App.css'
 import AudioWave from "./audiowave"
 
 const API_BASE_URL = 'http://18.232.77.24:5000/api/'
+// const API_BASE_URL = '/api/'
 const Button = styled(MuiButton)(spacing)
 
 function App() {
   const [url, setURL] = useState('');
-  const [urlData, setUrlData] = useState({});
+  const [urlData, setUrlData] = useState(null);
+  const [demuxStart, setDemuxStart] = useState(false);
   const [demuxComplete, setDemuxComplete] = useState(false);
-  const [inferHTTP, setInferHTTP] = useState(0);
 
   function getURLInfo(url) {
     setURL(url);
-    console.log('url set to ', url)
+    console.log('running UrlInfo for ', url)
     var info_api_str = API_BASE_URL+ "info?url=" + url;
     if (url !== '') {
       fetch(info_api_str)
         .then(response => response.json())
         .then(data => {
+          console.log(data);
           setUrlData(data);
-          console.log(urlData);
         })
         .catch(error => console.error(error));
     }
     return true;
   }
 
-  function runInference() {
-    if (!urlData) getURLInfo(url);
-    
+  function runInference(url) {
     var infer_api_str = API_BASE_URL + "demux?url=" + url;
+    getURLInfo(url);
+
     setDemuxComplete(false);
-    
     console.log('running inference for url', url);
     fetch(infer_api_str)
       .then(res => res.json())
       .then(data => {
-        setInferHTTP(data['status']);
-        setDemuxComplete(true);
-        console.log("inferMsg: ", inferMsg);
-        console.log("inferHTTP: ", inferHTTP);})
+        if (data['status'] === 200) {
+          setDemuxComplete(true);
+        }
+      })
       .catch(error => { 
         console.error(error);
         setDemuxComplete(false);
       });
   }
 
+  useEffect(() => {if (urlData) setDemuxStart(true);}, [urlData]);
+
   return (
     <div className='App'>
       <div className="wrapper">
-        <UserInput getURLInfo={getURLInfo} runInference={runInference} />
-        <Player folder={urlData['folder']} demuxComplete={demuxComplete} /> 
+        <UserInput runInference={runInference} 
+        statusMsg={demuxStart ? <Typography className="statusMsg">Running demuxr on {urlData['title']}</Typography> : null}/>
+
+        {demuxStart ? 
+        <Player folder={urlData['folder']} demuxStart={demuxStart} demuxComplete={demuxComplete} /> 
+        : null}
+
         <footer className="footer">
           <Typography variant="h6"> 
             Made with &#127927; by <a href="https://twitter.com/subramen">@subramen</a>
@@ -70,27 +77,35 @@ function App() {
 }
 
 
-function UserInput({ getURLInfo, runInference}) {
+function UserInput({runInference, statusMsg}) {
+  const urlInputRef = useRef();
+
   const handleSubmit = (e) => {
     e.preventDefault();
-    setTimeout(runInference, 1000);
+    runInference(urlInputRef.current);
   };
+
+  const statusMsg = (demuxStart ? 
+    <Typography className="statusMsg"> Running demuxr on {urlData['title']} </Typography> : 
+    <LinearProgress color="secondary" variant="indeterminate" />
+  );
 
   return (
     <div className="user-input">
       <Typography className="prompt" variant="h2" align="left">Ready to play?</Typography>
-        <input type="text" className="search-bar" placeholder="Paste URL here" 
-        onChange={(e) => { getURLInfo(e.target.value) }}/>
-        <span className="btn-progress">
-          <Button onClick={handleSubmit} px="45px" variant="contained" color="primary">Go</Button>
-        </span>
+      <input type="text" className="search-bar" placeholder="Paste URL here" 
+      onChange={(e) => { urlInputRef.current = e.target.value }}/>
+      <div className="btn-progress">
+        <Button onClick={handleSubmit} px="45px" variant="contained" color="primary">Go</Button>
+      </div>
+      {statusMsg}
     </div>
   );
 }
     
 
-function Player({folder, demuxComplete}) {
-  console.log("<Player> ", folder, demuxComplete);
+function Player({folder, demuxStart, demuxComplete}) {
+  console.log("<player> ", folder, demuxStart, demuxComplete);
 
   const stems = ['original', 'bass', 'drums', 'other', 'vocals'];
   const stemRefs = {
@@ -123,8 +138,9 @@ function Player({folder, demuxComplete}) {
   }
 
   return (
-    <div className='player'>
-      {folder ?
+    /* needs download */
+    <div className='player'> 
+      {demuxStart ?
       <Stem  folder={folder} id="original" onReady={handleReady} demuxComplete={demuxComplete} wavesurferRef={stemRefs['original']} handleSeek={handleSeek} />
       : null}
 

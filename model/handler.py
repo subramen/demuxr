@@ -112,7 +112,7 @@ class DemucsHandler(BaseHandler):
         track_folder = self.filedir / str(uuid.uuid4())
         track_folder.mkdir(parents=True)
         wav = self.preprocess(data, track_folder)
-        shutile.rmtree(track_folder)
+        shutil.rmtree(track_folder)
         stems = self.inference(wav)
         return self.postprocess(stems)
 
