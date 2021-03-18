@@ -8,6 +8,7 @@ import PauseCircleFilledIcon from '@material-ui/icons/PauseCircleFilled';
 import PlayCircleFilledIcon from '@material-ui/icons/PlayCircleFilled';
 import './App.css'
 import AudioWave from "./audiowave"
+import fetch from "./fetchWithTimeout"
 
 const API_BASE_URL = 'http://18.232.77.24:5000/api/'
 // const API_BASE_URL = '/api/'
@@ -15,55 +16,61 @@ const Button = styled(MuiButton)(spacing)
 
 function App() {
   const [url, setURL] = useState('');
-  const [urlData, setUrlData] = useState(null);
-  const [demuxStart, setDemuxStart] = useState(false);
+  const [urlData, setUrlData] = useState({});
+  const [isStart, setIsStart] = useState(false)
+  const [demuxRunning, setDemuxRunning] = useState(false);
   const [demuxComplete, setDemuxComplete] = useState(false);
 
   function getURLInfo(url) {
     setURL(url);
-    console.log('running UrlInfo for ', url)
+    setIsStart(true);
+    console.log('start', isStart);
     var info_api_str = API_BASE_URL+ "info?url=" + url;
-    if (url !== '') {
-      fetch(info_api_str)
-        .then(response => response.json())
-        .then(data => {
-          console.log(data);
-          setUrlData(data);
-        })
-        .catch(error => console.error(error));
-    }
-    return true;
-  }
 
-  function runInference(url) {
-    var infer_api_str = API_BASE_URL + "demux?url=" + url;
-    getURLInfo(url);
-
-    setDemuxComplete(false);
-    console.log('running inference for url', url);
-    fetch(infer_api_str)
-      .then(res => res.json())
+    console.log('running UrlInfo for ', url, '...')
+    return fetch(info_api_str)
+      .then(response => response.json())
       .then(data => {
-        if (data['status'] === 200) {
-          setDemuxComplete(true);
-        }
+        console.log('setting url data');
+        setUrlData(data);
+        setDemuxRunning(true);
       })
-      .catch(error => { 
+      .catch(error => {
         console.error(error);
-        setDemuxComplete(false);
+        setIsStart(false);  
       });
   }
 
-  useEffect(() => {if (urlData) setDemuxStart(true);}, [urlData]);
+  async function runInference(url) {
+    var infer_api_str = API_BASE_URL + "demux?url=" + url;
+    const promise = await getURLInfo(url);
+    console.log("promsie", promise);
 
+    if (promise){
+      setDemuxComplete(false);
+      console.log('running inference for url', url);
+      fetch(infer_api_str)
+        .then(res => res.json())
+        .then(data => {
+          if (data['status'] === 200) {
+            setDemuxComplete(true);
+          }
+        })
+        .catch(error => { 
+          console.error(error);
+          setDemuxComplete(false);
+        });
+    }
+    setDemuxRunning(false);
+  }
+  
   return (
     <div className='App'>
       <div className="wrapper">
-        <UserInput runInference={runInference} 
-        statusMsg={demuxStart ? <Typography className="statusMsg">Running demuxr on {urlData['title']}</Typography> : null}/>
-
-        {demuxStart ? 
-        <Player folder={urlData['folder']} demuxStart={demuxStart} demuxComplete={demuxComplete} /> 
+        <UserInput runInference={runInference} demuxRunning={demuxRunning} title={urlData ? urlData['title'] : ''} isStart={isStart}/>
+        
+        {demuxRunning ? 
+        <Player folder={urlData['folder']} demuxRunning={demuxRunning} demuxComplete={demuxComplete} /> 
         : null}
 
         <footer className="footer">
@@ -77,19 +84,32 @@ function App() {
 }
 
 
-function UserInput({runInference, statusMsg}) {
+function UserInput({runInference, demuxRunning, title, isStart }) {
   const urlInputRef = useRef();
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    runInference(urlInputRef.current);
+    let url = urlInputRef.current;
+    if (url !== '' && url !== undefined) {
+      runInference(url);
+    }
   };
 
-  const statusMsg = (demuxStart ? 
-    <Typography className="statusMsg"> Running demuxr on {urlData['title']} </Typography> : 
-    <LinearProgress color="secondary" variant="indeterminate" />
-  );
-
+  const statusMsg = () => {
+    if (demuxRunning) {
+      console.log('1');
+      return <Typography className="statusMsg"> Running demuxr on {title} </Typography>;
+    }
+    else if (isStart) {
+      console.log('2');
+      return <LinearProgress color="secondary" variant="indeterminate" />;
+    }
+    else {
+      console.log('3');
+      return null
+    }
+  };
+  console.log('woo');
   return (
     <div className="user-input">
       <Typography className="prompt" variant="h2" align="left">Ready to play?</Typography>
@@ -98,14 +118,14 @@ function UserInput({runInference, statusMsg}) {
       <div className="btn-progress">
         <Button onClick={handleSubmit} px="45px" variant="contained" color="primary">Go</Button>
       </div>
-      {statusMsg}
+      {statusMsg()}
     </div>
   );
 }
     
 
-function Player({folder, demuxStart, demuxComplete}) {
-  console.log("<player> ", folder, demuxStart, demuxComplete);
+function Player({folder, demuxRunning, demuxComplete}) {
+  console.log("<player> ", folder, demuxRunning, demuxComplete);
 
   const stems = ['original', 'bass', 'drums', 'other', 'vocals'];
   const stemRefs = {
@@ -140,7 +160,7 @@ function Player({folder, demuxStart, demuxComplete}) {
   return (
     /* needs download */
     <div className='player'> 
-      {demuxStart ?
+      {demuxRunning ?
       <Stem  folder={folder} id="original" onReady={handleReady} demuxComplete={demuxComplete} wavesurferRef={stemRefs['original']} handleSeek={handleSeek} />
       : null}
 
