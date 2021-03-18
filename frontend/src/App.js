@@ -97,19 +97,15 @@ function UserInput({runInference, demuxRunning, title, isStart }) {
 
   const statusMsg = () => {
     if (demuxRunning) {
-      console.log('1');
       return <Typography className="statusMsg"> Running demuxr on {title} </Typography>;
     }
     else if (isStart) {
-      console.log('2');
       return <LinearProgress color="secondary" variant="indeterminate" />;
     }
     else {
-      console.log('3');
       return null
     }
   };
-  console.log('woo');
   return (
     <div className="user-input">
       <Typography className="prompt" variant="h2" align="left">Ready to play?</Typography>
