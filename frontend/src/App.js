@@ -12,7 +12,7 @@ import './App.css'
 import AudioWave from "./audiowave"
 import fetch from "./fetchWithTimeout"
 
-const API_BASE_URL = '/api/'
+const API_BASE_URL = 'http://demuxr.com:5000/api/'
 const INFO_API = API_BASE_URL+ "info?url="
 const INFER_API = API_BASE_URL+ "demux?url="
 const Button = styled(MuiButton)(spacing)
@@ -23,49 +23,60 @@ function App() {
   const [isStart, setIsStart] = useState(false)
   const [demuxRunning, setDemuxRunning] = useState(false);
   const [demuxComplete, setDemuxComplete] = useState(false);
+  // const urlData = useRef({});
 
-  function getURLInfo(url) {
+
+  const fetchURLInfo = useCallback((url) => {
+    console.log('fetching info for url ', url, '...')
+    return fetch(INFO_API + url).then(response => response.json())
+  });
+
+  
+  const fetchInference = useCallback((url) => {
+    console.log('running inference for url', url, '...');
+    return fetch(INFER_API + url, 1200000).then(response => response.json())
+  });
+
+
+  function fetchPipe(url) {
     setURL(url);
     setIsStart(true);
 
-    console.log('running UrlInfo for ', url, '...')
-    
-    fetch(INFO_API + url)
-      .then(response => response.json())
-      .then(data => setUrlData(data))
-      .catch(error => {
-        console.error(error);
-        setIsStart(false);  
-      });
+    fetchURLInfo(url)
+    .then(data => {
+      // urlData.current = data
+      setUrlData(data);
+    })
+    .then(() => {
+      setDemuxComplete(false);
+      setDemuxRunning(true);
+      return fetchInference(url)
+    })
+    .then(data => {
+      //
+      console.log(data);
+      //
+      (data['status'] === 200)
+      ? setDemuxComplete(true)
+      : {};
+    })
+    .catch(error => { 
+      console.error(error);
+      setIsStart(false);
+      setDemuxRunning(false);
+      setDemuxComplete(false);
+    });   
   }
-
-  function runInference(url) {
-    getURLInfo(url);
-    setDemuxComplete(false);
-    setDemuxRunning(true);
-    console.log('running inference for url', url);
-      
-    fetch(INFER_API + url, 1200000)
-      .then(res => res.json())
-      .then(data => {
-        
-        console.log(data);
-
-        (data['status'] === 200)
-        ? setDemuxComplete(true)
-        : {};
-      })
-      .catch(error => { 
-        console.error(error);
-        setDemuxComplete(false);
-      });   
-  }
+  
+  useEffect(() => {
+    console.log(urlData);
+  }, [urlData]);
   
   return (
     <div className='App'>
       <div className="wrapper">
         <UserInput 
-        runInference={runInference} 
+        runInference={fetchPipe} 
         title={urlData ? urlData['title'] : ''} 
         isStart={isStart} 
         demuxRunning={demuxRunning} 
@@ -104,10 +115,14 @@ function UserInput({runInference, title, isStart, demuxRunning, demuxComplete })
       return null;
     }
     if (demuxRunning) {
-      return <Typography className="statusMsg"> {status} </Typography>;
+      return <Typography className="statusMsg"> {status()} </Typography>;
     }
     else if (isStart) {
       return <LinearProgress color="secondary" variant="indeterminate" />;
+    }
+    else {
+      console.log('Run failed!');
+      return null;
     }
   };
   return (
@@ -158,7 +173,6 @@ function Player({folder, demuxRunning, demuxComplete}) {
   }
 
   return (
-    /* needs download */
     <div className='player'> 
       
       {!(playEnabled || demuxRunning)? <LinearProgress color="secondary" variant="indeterminate" /> : null}
