@@ -26,7 +26,9 @@ def grep(folder, stem=None):
     try:
         S3_CLIENT.head_object(Bucket=BUCKET, Key=f"{folder}/{stem}")
     except ClientError:
+        logger.info(f"{folder}/{stem} not found in cache")
         return False
+    logger.info(f"{folder}/{stem} found in cache")
     return True
 
 # upload to s3

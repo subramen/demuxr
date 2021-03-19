@@ -33,13 +33,14 @@ def demux():
     folder = youtubedl(url, download=False)['id']
 
     # Check if demuxed stems in cache
-    if not s3.grep(folder, 'vocal'):
+    if not s3.grep(folder, 'vocals'):
         stem_bytes = run_demuxr(folder)
-        for stem, bytes in stem_bytes:
+        for stem, bytes in stem_bytes.items():
             s3.upload_stem(bytes, folder, stem)
 
     response['status'] = 200
     response['msg'] = s3.get_url(folder)
+    logger.info(f"Response = {response}")
     return response
 
   
@@ -50,7 +51,8 @@ def get_video_info(url):
         'url': url,
         'title': info_dict['title'],
         'id': info_dict['id'],
-        'folder': s3.get_url(info_dict['id'])
+        'folder': s3.get_url(info_dict['id']),
+        'status': 200
     }
     logger.info(response)
     return response

@@ -26,7 +26,7 @@ def encode_mp3(wav, verbose=False):
     encoder.set_bit_rate(320)
     encoder.set_in_sample_rate(44100)
     encoder.set_channels(2)
-    encoder.set_quality(2)  # 2-highest, 7-fastest
+    encoder.set_quality(4)  # 2-highest, 7-fastest
     if not verbose:
         encoder.silence()
     mp3_data = encoder.encode(wav.tostring())
