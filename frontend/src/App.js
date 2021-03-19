@@ -45,7 +45,7 @@ function App() {
     setDemuxRunning(true);
     console.log('running inference for url', url);
       
-    fetch(INFER_API + url, 600000)
+    fetch(INFER_API + url, 1200000)
       .then(res => res.json())
       .then(data => {
         
@@ -97,12 +97,14 @@ function UserInput({runInference, title, isStart, demuxRunning, demuxComplete })
     }
   };
 
+  const status = useCallback(() => {"Running demuxr " + (title ? ("on " + title) : "")}, [title])
+
   const statusMsg = () => {
     if (demuxComplete) {
       return null;
     }
     if (demuxRunning) {
-      return <Typography className="statusMsg"> Running demuxr </Typography>;
+      return <Typography className="statusMsg"> {status} </Typography>;
     }
     else if (isStart) {
       return <LinearProgress color="secondary" variant="indeterminate" />;
@@ -159,7 +161,7 @@ function Player({folder, demuxRunning, demuxComplete}) {
     /* needs download */
     <div className='player'> 
       
-      {!playEnabled ? <LinearProgress color="secondary" variant="indeterminate" /> : null}
+      {!(playEnabled || demuxRunning)? <LinearProgress color="secondary" variant="indeterminate" /> : null}
 
       {demuxRunning ?
       <Stem  folder={folder} id="original" onReady={handleReady} demuxComplete={demuxComplete} wavesurferRef={stemRefs['original']} handleSeek={handleSeek} />
