@@ -22,22 +22,29 @@ html, body {
 
 .user-input {
     display: grid;
-    grid-template-rows: repeat(4, minmax(100px, 1fr));
+    grid-template-rows: repeat(2, minmax(100px, 1fr)) repeat(2, 50px);
     gap: 20px;
     grid-template-areas:
         "prompt"
         "search-bar"
-        "btn-progress"
+        "btn-go"
         "status";
     grid-area: user-input;
 }
+
+.status {
+    display: grid;
+    grid-template-rows: 100px;
+    gap: 20px;
+    grid-area:status;
+    
+}
     .prompt { grid-area: prompt; }
 
-    .status { grid-area: status;}
 
-    .btn-progress {
+    .btn-go {
         display: grid;
-        grid-area: btn-progress;
+        grid-area: btn-go;
         grid-template-rows: 42px ;
         gap: 20px;
         justify-self: center;
@@ -67,7 +74,7 @@ html, body {
     grid-column-gap: 120px;
     grid-template-rows: 1fr auto auto;
     grid-template-areas:
-        "loading-stem"
+        "stemoriginal"
         "stemgroup"
         "play-btn";
 }
@@ -78,15 +85,10 @@ html, body {
         justify-content: space-between;
     }
 
-    #original {
+    .stemoriginal {
         grid-area: loading-stem;
     }
     
-    .stem-slider {
-        align-self: center;
-        width: 20vw;
-    }
-
     .stemgroup {
         display: grid;
         grid-area: stemgroup;
@@ -95,6 +97,12 @@ html, body {
         grid-template-columns: repeat(2,minmax(100px, 1fr));
         align-content: center;
     }
+
+    .stem-slider {
+        align-self: center;
+        width: 20vw;
+    }
+
         
     .play-btn {
         grid-area: play-btn;
@@ -114,15 +122,16 @@ html, body {
             grid-column: col-start 2 / 12;
             grid-row: 2;
         }
+        /* .status{
+            grid-column: col-start 5/9;
+            grid-row: 3;
+        } */
         .player {
             grid-column: col-start 2 / 12;
-            grid-row: 3;
-            }
-        .ad {
             grid-row: 4;
-        }
+            }
         .footer {
-            grid-row: 5;
+            grid-row: 7;
         } 
     }
     
@@ -132,15 +141,15 @@ html, body {
           grid-column: col-start 4 / span 6;
           grid-row: 2;
         }
-
+        /* .status{
+            grid-column: col-start 5 / span 4;
+            grid-row: 4;
+        } */
         .player {
             grid-column: col-start 3 / 11;
-            grid-row: 3;
-          }
-        .ad {
             grid-row: 4;
-        }
+          }
         .footer {
-            grid-row: 5;
+            grid-row: 7;
         } 
       }

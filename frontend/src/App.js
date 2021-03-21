@@ -1,11 +1,10 @@
 // TODO: Destroy all stem waveforms on url change
 
 import React, { useState, useEffect, useRef, useCallback } from 'react'
-import ReactPlayer from 'react-player/file'
 import { styled } from "@material-ui/core/styles";
 import { spacing } from "@material-ui/system";
 import MuiButton from "@material-ui/core/Button";
-import { LinearProgress, IconButton, Typography, Slider, CircularProgress } from '@material-ui/core';
+import { LinearProgress, IconButton, Typography, Slider } from '@material-ui/core';
 import PauseCircleFilledIcon from '@material-ui/icons/PauseCircleFilled';
 import PlayCircleFilledIcon from '@material-ui/icons/PlayCircleFilled';
 import './App.css'
@@ -23,8 +22,6 @@ function App() {
   const [isStart, setIsStart] = useState(false)
   const [demuxRunning, setDemuxRunning] = useState(false);
   const [demuxComplete, setDemuxComplete] = useState(false);
-  // const urlData = useRef({});
-
 
   const fetchURLInfo = useCallback((url) => {
     console.log('fetching info for url ', url, '...')
@@ -37,52 +34,57 @@ function App() {
     return fetch(INFER_API + url, 1200000).then(response => response.json())
   });
 
+  const resetStates = useCallback(() => {
+    setIsStart(false);
+    setDemuxRunning(false);
+    setDemuxComplete(false);
+  })
 
-  function fetchPipe(url) {
+
+  function runDemuxr(url) {
+    resetStates();
     setURL(url);
     setIsStart(true);
 
     fetchURLInfo(url)
     .then(data => {
-      // urlData.current = data
       setUrlData(data);
     })
     .then(() => {
-      setDemuxComplete(false);
+      setIsStart(false);
       setDemuxRunning(true);
       return fetchInference(url)
     })
     .then(data => {
-      //
-      console.log(data);
-      //
-      (data['status'] === 200)
-      ? setDemuxComplete(true)
-      : {};
+      if (data['status'] === 200) {
+        setDemuxRunning(false)
+        setDemuxComplete(true);
+      }
+      else {
+        throw new Error("Demuxr failed, HTTP:", data['status']);
+      }
+      return data['status'];
     })
     .catch(error => { 
       console.error(error);
-      setIsStart(false);
-      setDemuxRunning(false);
-      setDemuxComplete(false);
+      resetStates();
     });   
   }
-  
-  useEffect(() => {
-    console.log(urlData);
-  }, [urlData]);
+
   
   return (
     <div className='App'>
       <div className="wrapper">
         <UserInput 
-        runInference={fetchPipe} 
-        title={urlData ? urlData['title'] : ''} 
+        runDemuxr={runDemuxr} 
+        urlData={urlData} 
         isStart={isStart} 
         demuxRunning={demuxRunning} 
         demuxComplete={demuxComplete} />
+
+
         
-        {demuxRunning ? 
+        {demuxRunning || demuxComplete ? 
         <Player folder={urlData['folder']} demuxRunning={demuxRunning} demuxComplete={demuxComplete} /> 
         : null}
 
@@ -97,43 +99,46 @@ function App() {
 }
 
 
-function UserInput({runInference, title, isStart, demuxRunning, demuxComplete }) {
+function Status(props) {
+  const {isStart, demuxRunning, demuxComplete, urlData } = props;
+  console.log(props);
+
+  let elt = null;
+  if (isStart) { 
+    elt = <LinearProgress color="secondary" variant="indeterminate" />; 
+  }
+  else if (demuxRunning) { 
+    const msg = "Running demuxr " + (urlData['title'] ? "on " + urlData['title'] : "");
+    elt = <Typography color="secondary"> {msg} </Typography>; 
+  }
+  else if (demuxComplete) {
+    elt = <Typography color="secondary">Ready to play!</Typography>; 
+  }
+  return ( <div className="status">{elt}</div> );
+}
+
+
+
+function UserInput({runDemuxr, urlData, isStart, demuxRunning, demuxComplete }) {
   const urlInputRef = useRef();
 
   const handleSubmit = (e) => {
     e.preventDefault();
     let url = urlInputRef.current;
-    if (url !== '' && url !== undefined) {
-      runInference(url);
+    if (!(url === '' || url === undefined)) {
+      runDemuxr(url);
     }
   };
 
-  const status = useCallback(() => {"Running demuxr " + (title ? ("on " + title) : "")}, [title])
-
-  const statusMsg = () => {
-    if (demuxComplete) {
-      return null;
-    }
-    if (demuxRunning) {
-      return <Typography className="statusMsg"> {status()} </Typography>;
-    }
-    else if (isStart) {
-      return <LinearProgress color="secondary" variant="indeterminate" />;
-    }
-    else {
-      console.log('Run failed!');
-      return null;
-    }
-  };
   return (
     <div className="user-input">
-      <Typography className="prompt" variant="h2" align="left">Ready to play?</Typography>
+      <Typography className="prompt" variant="h2" align="center"> Demuxr </Typography>
       <input type="text" className="search-bar" placeholder="Paste URL here" 
       onChange={(e) => { urlInputRef.current = e.target.value }}/>
-      <div className="btn-progress">
+      <div className="btn-go">
         <Button onClick={handleSubmit} px="45px" variant="contained" color="primary">Go</Button>
       </div>
-      {statusMsg()}
+      <Status isStart={isStart} demuxRunning={demuxRunning} demuxComplete={demuxComplete} urlData={urlData}/>
     </div>
   );
 }
@@ -141,7 +146,8 @@ function UserInput({runInference, title, isStart, demuxRunning, demuxComplete })
 
 function Player({folder, demuxRunning, demuxComplete}) {
   console.log("<player> ", folder, demuxRunning, demuxComplete);
-
+  
+  const [playEnabled, setPlayEnabled] = useState(false)
   const stems = ['original', 'bass', 'drums', 'other', 'vocals'];
   const stemRefs = {
     'original': useRef(),
@@ -150,7 +156,6 @@ function Player({folder, demuxRunning, demuxComplete}) {
     'other': useRef(),
     'vocals': useRef()
   };
-  const [playEnabled, setPlayEnabled] = useState(false)
   
   const readyCountRef = useRef(0);
   const handleReady = () => {
@@ -160,7 +165,6 @@ function Player({folder, demuxRunning, demuxComplete}) {
   };
 
   const handlePlayPause = () => {
-    console.log("play/pause");
     Object.values(stemRefs).map(ref => ref.current.playPause());
   }
 
@@ -175,18 +179,16 @@ function Player({folder, demuxRunning, demuxComplete}) {
   return (
     <div className='player'> 
       
-      {!(playEnabled || demuxRunning)? <LinearProgress color="secondary" variant="indeterminate" /> : null}
-
-      {demuxRunning ?
-      <Stem  folder={folder} id="original" onReady={handleReady} demuxComplete={demuxComplete} wavesurferRef={stemRefs['original']} handleSeek={handleSeek} />
-      : null}
+      <div id="stemoriginal">
+        <Stem folder={folder} id="original" label={demuxRunning ? "Demuxing..." : "Original Track"} onReady={handleReady} demuxComplete={demuxComplete} wavesurferRef={stemRefs['original']} handleSeek={handleSeek} />
+      </div>
 
       {demuxComplete ? 
         <div className='stemgroup'>
-          <Stem folder={folder} id='bass'  onReady={handleReady} demuxComplete={demuxComplete} wavesurferRef={stemRefs['bass']} handleSeek={()=>{}}/>
-          <Stem folder={folder} id='drums'  onReady={handleReady} demuxComplete={demuxComplete} wavesurferRef={stemRefs['drums']} handleSeek={()=>{}}/>
-          <Stem folder={folder} id='other'  onReady={handleReady} demuxComplete={demuxComplete} wavesurferRef={stemRefs['other']} handleSeek={()=>{}}/>
-          <Stem folder={folder} id='vocals'  onReady={handleReady} demuxComplete={demuxComplete} wavesurferRef={stemRefs['vocals']} handleSeek={()=>{}}/>
+          <Stem folder={folder} id='bass' label="Bass" onReady={handleReady} demuxComplete={demuxComplete} wavesurferRef={stemRefs['bass']} handleSeek={()=>{}}/>
+          <Stem folder={folder} id='drums' label="Drums" onReady={handleReady} demuxComplete={demuxComplete} wavesurferRef={stemRefs['drums']} handleSeek={()=>{}}/>
+          <Stem folder={folder} id='other' label="Other" onReady={handleReady} demuxComplete={demuxComplete} wavesurferRef={stemRefs['other']} handleSeek={()=>{}}/>
+          <Stem folder={folder} id='vocals' label="Vocals" onReady={handleReady} demuxComplete={demuxComplete} wavesurferRef={stemRefs['vocals']} handleSeek={()=>{}}/>
         </div>
         : null}
 
@@ -194,9 +196,7 @@ function Player({folder, demuxRunning, demuxComplete}) {
         <PlayPauseButton 
           onClick={handlePlayPause} 
           disabled={!playEnabled}
-        > 
-          Play/Pause 
-        </PlayPauseButton>
+        />
       </div>
     </div>
   );
@@ -204,14 +204,14 @@ function Player({folder, demuxRunning, demuxComplete}) {
 
 
 function Stem(props) {
-  const {folder, id, onReady, demuxComplete, wavesurferRef, handleSeek} = props;
+  const {folder, id, label, onReady, demuxComplete, wavesurferRef, handleSeek} = props;
   const url = folder + '/' + id + '.mp3';
 
   return (
     folder 
     ? (
     <div className={'stem ' + id}>
-      <Typography id="stem-label" align="center" variant="h6">{id}</Typography>
+      <Typography id="stem-label" align="center" variant="h6">{label}</Typography>
       <AudioWave
         url={url}
         id={id}

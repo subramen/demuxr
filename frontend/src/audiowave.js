@@ -10,7 +10,7 @@ import React, {
   
   
   export default function AudioWave( {url, id, demuxComplete, onReady, wavesurferRef, handleSeek} ) {
-    const buffer = 1200;
+    const buffer = 1600;
     const [timelineVis, setTimelineVis] = useState(true);
     const [songLength, setSongLength] = useState(0);
   
@@ -23,6 +23,7 @@ import React, {
       backgroundColor: 'black',
       waveColor: 'grey',
       progressColor: '#637bc1', 
+      interact: false,
     };
   
     const plugins = useMemo(() => {
@@ -47,7 +48,7 @@ import React, {
         wavesurferRef.current = waveSurfer;
         if (wavesurferRef.current) {
           wavesurferRef.current.load(url);
-          console.log("Loaded url for ", id);
+          console.log("Loaded url for ", url, id);
 
           wavesurferRef.current.on("ready", () => {
             console.log("WaveSurfer is ready for ", id);
@@ -83,6 +84,10 @@ import React, {
         elt.seekTo(0);
         elt.setWaveColor('#637bc1');
         elt.setProgressColor('#1c36c9');
+        if (id !== "original") {
+          // allow seeking on original track
+          elt.toggleInteraction();
+        }
       }
       return () => clearInterval(timer);
     });
