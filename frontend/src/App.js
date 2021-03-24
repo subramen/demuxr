@@ -11,7 +11,7 @@ import './App.css'
 import AudioWave from "./audiowave"
 import fetch from "./fetchWithTimeout"
 
-const API_BASE_URL = 'http://demuxr.com:5000/api/'
+const API_BASE_URL = '/api/'
 const INFO_API = API_BASE_URL+ "info?url="
 const INFER_API = API_BASE_URL+ "demux?url="
 const Button = styled(MuiButton)(spacing)
