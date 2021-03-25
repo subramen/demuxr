@@ -1,15 +1,16 @@
 // TODO: Destroy all stem waveforms on url change
 
-import React, { useState, useEffect, useRef, useCallback } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import { unmountComponentAtNode, findDOMNode } from "react-dom";
 import { styled } from "@material-ui/core/styles";
 import { spacing } from "@material-ui/system";
 import MuiButton from "@material-ui/core/Button";
 import { LinearProgress, IconButton, Typography, Slider } from '@material-ui/core';
 import PauseCircleFilledIcon from '@material-ui/icons/PauseCircleFilled';
 import PlayCircleFilledIcon from '@material-ui/icons/PlayCircleFilled';
-import './App.css'
-import AudioWave from "./audiowave"
-import fetch from "./fetchWithTimeout"
+import './App.css';
+import AudioWave from "./audiowave";
+import fetch from "./fetchWithTimeout";
 
 const API_BASE_URL = 'http://demuxr.com:5000/api/'
 const INFO_API = API_BASE_URL+ "info?url="
@@ -17,7 +18,7 @@ const INFER_API = API_BASE_URL+ "demux?url="
 const Button = styled(MuiButton)(spacing)
 
 function App() {
-  const [url, setURL] = useState('');
+  const [sessId, setSessId] = useState(0);
   const [urlData, setUrlData] = useState({});
   const [isStart, setIsStart] = useState(false)
   const [demuxRunning, setDemuxRunning] = useState(false);
@@ -35,15 +36,16 @@ function App() {
   });
 
   const resetStates = useCallback(() => {
+    console.log("resetting from ",isStart, demuxRunning, demuxComplete);
     setIsStart(false);
     setDemuxRunning(false);
     setDemuxComplete(false);
+    setSessId(Date.now());
+    console.log(sessId);
   })
 
 
   function runDemuxr(url) {
-    resetStates();
-    setURL(url);
     setIsStart(true);
 
     fetchURLInfo(url)
@@ -80,17 +82,14 @@ function App() {
         urlData={urlData} 
         isStart={isStart} 
         demuxRunning={demuxRunning} 
-        demuxComplete={demuxComplete} />
-
-
-        
-        {demuxRunning || demuxComplete ? 
-        <Player folder={urlData['folder']} demuxRunning={demuxRunning} demuxComplete={demuxComplete} /> 
-        : null}
-
+        demuxComplete={demuxComplete} 
+        resetStates={resetStates}/>
+       
+        <Player key={sessId} folder={urlData['folder']} demuxRunning={demuxRunning} demuxComplete={demuxComplete} /> 
+       
         <footer className="footer">
           <Typography variant="h6"> 
-            Made with &#127927; by <a href="https://twitter.com/subramen">@subramen</a>
+            Made with &#127927; by <a href="https://github.com/suraj813/karaoke">suraj813</a>
           </Typography>
         </footer>
       </div>
@@ -101,7 +100,6 @@ function App() {
 
 function Status(props) {
   const {isStart, demuxRunning, demuxComplete, urlData } = props;
-  console.log(props);
 
   let elt = null;
   if (isStart) { 
@@ -119,13 +117,14 @@ function Status(props) {
 
 
 
-function UserInput({runDemuxr, urlData, isStart, demuxRunning, demuxComplete }) {
+function UserInput({runDemuxr, urlData, isStart, demuxRunning, demuxComplete, resetStates }) {
   const urlInputRef = useRef();
 
   const handleSubmit = (e) => {
     e.preventDefault();
     let url = urlInputRef.current;
     if (!(url === '' || url === undefined)) {
+      resetStates();
       runDemuxr(url);
     }
   };
@@ -156,8 +155,21 @@ function Player({folder, demuxRunning, demuxComplete}) {
     'other': useRef(),
     'vocals': useRef()
   };
-  
   const readyCountRef = useRef(0);
+
+  useEffect(() => {
+    () => {};
+    return () =>  Object.values(stemRefs).map(ref => {
+      if (ref.current) { 
+        console.log('destroying')
+        ref.current.stop();
+        ref.current.destroy();
+        setPlayEnabled(false);
+        
+      }
+    });
+  }, []);
+  
   const handleReady = () => {
     readyCountRef.current += 1;
     console.log("ready ", readyCountRef.current, stems.length);
@@ -176,30 +188,35 @@ function Player({folder, demuxRunning, demuxComplete}) {
     }
   }
 
-  return (
-    <div className='player'> 
-      
-      <div id="stemoriginal">
-        <Stem folder={folder} id="original" label={demuxRunning ? "Demuxing..." : "Original Track"} onReady={handleReady} demuxComplete={demuxComplete} wavesurferRef={stemRefs['original']} handleSeek={handleSeek} />
-      </div>
-
-      {demuxComplete ? 
-        <div className='stemgroup'>
-          <Stem folder={folder} id='bass' label="Bass" onReady={handleReady} demuxComplete={demuxComplete} wavesurferRef={stemRefs['bass']} handleSeek={()=>{}}/>
-          <Stem folder={folder} id='drums' label="Drums" onReady={handleReady} demuxComplete={demuxComplete} wavesurferRef={stemRefs['drums']} handleSeek={()=>{}}/>
-          <Stem folder={folder} id='other' label="Other" onReady={handleReady} demuxComplete={demuxComplete} wavesurferRef={stemRefs['other']} handleSeek={()=>{}}/>
-          <Stem folder={folder} id='vocals' label="Vocals" onReady={handleReady} demuxComplete={demuxComplete} wavesurferRef={stemRefs['vocals']} handleSeek={()=>{}}/>
+  if (!(demuxRunning || demuxComplete)){
+    return null;
+  }
+  else {
+    return (
+      <div className='player'> 
+        
+        <div id="stemoriginal">
+          <Stem folder={folder} id="original" label={demuxRunning ? "Demuxing..." : "Original Track"} onReady={handleReady} demuxComplete={demuxComplete} wavesurferRef={stemRefs['original']} handleSeek={handleSeek} />
         </div>
-        : null}
-
-      <div className='play-btn'>  
-        <PlayPauseButton 
-          onClick={handlePlayPause} 
-          disabled={!playEnabled}
-        />
+  
+        {demuxComplete ? 
+          <div className='stemgroup'>
+            <Stem folder={folder} id='bass' label="Bass" onReady={handleReady} demuxComplete={demuxComplete} wavesurferRef={stemRefs['bass']} handleSeek={()=>{}}/>
+            <Stem folder={folder} id='drums' label="Drums" onReady={handleReady} demuxComplete={demuxComplete} wavesurferRef={stemRefs['drums']} handleSeek={()=>{}}/>
+            <Stem folder={folder} id='other' label="Other" onReady={handleReady} demuxComplete={demuxComplete} wavesurferRef={stemRefs['other']} handleSeek={()=>{}}/>
+            <Stem folder={folder} id='vocals' label="Vocals" onReady={handleReady} demuxComplete={demuxComplete} wavesurferRef={stemRefs['vocals']} handleSeek={()=>{}}/>
+          </div>
+          : null}
+  
+        <div className='play-btn'>  
+          <PlayPauseButton 
+            onClick={handlePlayPause} 
+            disabled={!playEnabled}
+          />
+        </div>
       </div>
-    </div>
-  );
+    );
+  }
 }
 
 
@@ -208,8 +225,6 @@ function Stem(props) {
   const url = folder + '/' + id + '.mp3';
 
   return (
-    folder 
-    ? (
     <div className={'stem ' + id}>
       <Typography id="stem-label" align="center" variant="h6">{label}</Typography>
       <AudioWave
@@ -231,13 +246,10 @@ function Stem(props) {
         />
       </div>
     </div>
-    )
-    : null
   );
 }
 
-function PlayPauseButton(props) {
-  const {onClick, disabled} = props;
+function PlayPauseButton({onClick, disabled}) {
   const [playing, setPlaying] = useState(false);
 
   const play_pause = playing ?  <PauseCircleFilledIcon fontSize="inherit"/> : <PlayCircleFilledIcon fontSize="inherit"/>
@@ -247,10 +259,6 @@ function PlayPauseButton(props) {
     </IconButton>
   );
 }
-
-
-
-
 
 
 export default App;
