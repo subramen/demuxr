@@ -84,7 +84,7 @@ function App () {
 
         <footer className="footer">
           <Typography variant="h6">
-            Made with &#127927; by <a href="https://github.com/suraj813/karaoke" target="_blank">suraj813</a>
+            Made with &#127927; by <a href="https://github.com/suraj813/karaoke" target="_blank" rel="noreferrer noopener">suraj813</a>
           </Typography>
         </footer>
       </div>
