@@ -1,228 +1,213 @@
-// TODO: Destroy all stem waveforms on url change
+/* eslint-disable react/prop-types */
+import React, { useState, useEffect, useRef, useCallback } from 'react'
+import AudioWave from './audiowave'
+import fetch from './fetchWithTimeout'
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
-import { unmountComponentAtNode, findDOMNode } from "react-dom";
-import { styled } from "@material-ui/core/styles";
-import { spacing } from "@material-ui/system";
-import MuiButton from "@material-ui/core/Button";
-import { LinearProgress, IconButton, Typography, Slider } from '@material-ui/core';
-import PauseCircleFilledIcon from '@material-ui/icons/PauseCircleFilled';
-import PlayCircleFilledIcon from '@material-ui/icons/PlayCircleFilled';
-import './App.css';
-import AudioWave from "./audiowave";
-import fetch from "./fetchWithTimeout";
+import { styled } from '@material-ui/core/styles'
+import { spacing } from '@material-ui/system'
+import MuiButton from '@material-ui/core/Button'
+import { LinearProgress, IconButton, Typography, Slider } from '@material-ui/core'
+import PauseCircleFilledIcon from '@material-ui/icons/PauseCircleFilled'
+import PlayCircleFilledIcon from '@material-ui/icons/PlayCircleFilled'
+import './App.css'
 
 const API_BASE_URL = '/api/'
-const INFO_API = API_BASE_URL+ "info?url="
-const INFER_API = API_BASE_URL+ "demux?url="
+const INFO_API = API_BASE_URL + 'info?url='
+const INFER_API = API_BASE_URL + 'demux?url='
 const Button = styled(MuiButton)(spacing)
 
-function App() {
-  const [sessId, setSessId] = useState(0);
-  const [urlData, setUrlData] = useState({});
+function App () {
+  const [sessId, setSessId] = useState(0)
+  const [urlData, setUrlData] = useState({})
   const [isStart, setIsStart] = useState(false)
-  const [demuxRunning, setDemuxRunning] = useState(false);
-  const [demuxComplete, setDemuxComplete] = useState(false);
+  const [demuxRunning, setDemuxRunning] = useState(false)
+  const [demuxComplete, setDemuxComplete] = useState(false)
 
   const fetchURLInfo = useCallback((url) => {
     console.log('fetching info for url ', url, '...')
     return fetch(INFO_API + url).then(response => response.json())
-  });
-
-  
-  const fetchInference = useCallback((url) => {
-    console.log('running inference for url', url, '...');
-    return fetch(INFER_API + url, 1200000).then(response => response.json())
-  });
-
-  const resetStates = useCallback(() => {
-    console.log("resetting from ",isStart, demuxRunning, demuxComplete);
-    setIsStart(false);
-    setDemuxRunning(false);
-    setDemuxComplete(false);
-    setSessId(Date.now());
-    console.log(sessId);
   })
 
+  const fetchInference = useCallback((url) => {
+    console.log('running inference for url', url, '...')
+    return fetch(INFER_API + url, 1200000).then(response => response.json())
+  })
 
-  function runDemuxr(url) {
-    setIsStart(true);
+  const resetStates = useCallback(() => {
+    console.log('resetting from ', isStart, demuxRunning, demuxComplete)
+    setIsStart(false)
+    setDemuxRunning(false)
+    setDemuxComplete(false)
+    setSessId(Date.now())
+    console.log(sessId)
+  })
+
+  function runDemuxr (url) {
+    setIsStart(true)
 
     fetchURLInfo(url)
-    .then(data => {
-      setUrlData(data);
-    })
-    .then(() => {
-      setIsStart(false);
-      setDemuxRunning(true);
-      return fetchInference(url)
-    })
-    .then(data => {
-      if (data['status'] === 200) {
-        setDemuxRunning(false)
-        setDemuxComplete(true);
-      }
-      else {
-        throw new Error("Demuxr failed, HTTP:", data['status']);
-      }
-      return data['status'];
-    })
-    .catch(error => { 
-      console.error(error);
-      resetStates();
-    });   
+      .then(data => {
+        setUrlData(data)
+      })
+      .then(() => {
+        setIsStart(false)
+        setDemuxRunning(true)
+        return fetchInference(url)
+      })
+      .then(data => {
+        if (data.status === 200) {
+          setDemuxRunning(false)
+          setDemuxComplete(true)
+        } else {
+          throw new Error('Demuxr failed, HTTP:', data.status)
+        }
+        return data.status
+      })
+      .catch(error => {
+        console.error(error)
+        resetStates()
+      })
   }
 
-  
   return (
     <div className='App'>
       <div className="wrapper">
-        <UserInput 
-        runDemuxr={runDemuxr} 
-        urlData={urlData} 
-        isStart={isStart} 
-        demuxRunning={demuxRunning} 
-        demuxComplete={demuxComplete} 
+        <UserInput
+        runDemuxr={runDemuxr}
+        urlData={urlData}
+        isStart={isStart}
+        demuxRunning={demuxRunning}
+        demuxComplete={demuxComplete}
         resetStates={resetStates}/>
-       
-        <Player key={sessId} folder={urlData['folder']} demuxRunning={demuxRunning} demuxComplete={demuxComplete} /> 
-       
+
+        <Player key={sessId} folder={urlData.folder} demuxRunning={demuxRunning} demuxComplete={demuxComplete} />
+
         <footer className="footer">
-          <Typography variant="h6"> 
+          <Typography variant="h6">
             Made with &#127927; by <a href="https://github.com/suraj813/karaoke">suraj813</a>
           </Typography>
         </footer>
       </div>
     </div>
-  );
+  )
 }
 
+function Status (props) {
+  const { isStart, demuxRunning, demuxComplete, urlData } = props
 
-function Status(props) {
-  const {isStart, demuxRunning, demuxComplete, urlData } = props;
-
-  let elt = null;
-  if (isStart) { 
-    elt = <LinearProgress color="secondary" variant="indeterminate" />; 
+  let elt = null
+  if (isStart) {
+    elt = <LinearProgress color="secondary" variant="indeterminate" />
+  } else if (demuxRunning) {
+    const msg = 'Running demuxr ' + (urlData.title ? 'on ' + urlData.title : '')
+    elt = <Typography color="secondary"> {msg} </Typography>
+  } else if (demuxComplete) {
+    elt = <Typography color="secondary">Ready to play!</Typography>
   }
-  else if (demuxRunning) { 
-    const msg = "Running demuxr " + (urlData['title'] ? "on " + urlData['title'] : "");
-    elt = <Typography color="secondary"> {msg} </Typography>; 
-  }
-  else if (demuxComplete) {
-    elt = <Typography color="secondary">Ready to play!</Typography>; 
-  }
-  return ( <div className="status">{elt}</div> );
+  return (<div className="status">{elt}</div>)
 }
 
-
-
-function UserInput({runDemuxr, urlData, isStart, demuxRunning, demuxComplete, resetStates }) {
-  const urlInputRef = useRef();
+function UserInput ({ runDemuxr, urlData, isStart, demuxRunning, demuxComplete, resetStates }) {
+  const urlInputRef = useRef()
 
   const handleSubmit = (e) => {
-    e.preventDefault();
-    let url = urlInputRef.current;
+    e.preventDefault()
+    const url = urlInputRef.current
     if (!(url === '' || url === undefined)) {
-      resetStates();
-      runDemuxr(url);
+      resetStates()
+      runDemuxr(url)
     }
-  };
+  }
 
   return (
     <div className="user-input">
-      <Typography className="prompt" variant="h2" align="center"> Demuxr </Typography>
-      <input type="text" className="search-bar" placeholder="Paste URL here" 
+      <Typography className="prompt" variant="h2" align="center"> demuxr </Typography>
+      <input type="text" className="search-bar" placeholder="Paste URL here"
       onChange={(e) => { urlInputRef.current = e.target.value }}/>
       <div className="btn-go">
         <Button onClick={handleSubmit} px="45px" variant="contained" color="primary">Go</Button>
       </div>
       <Status isStart={isStart} demuxRunning={demuxRunning} demuxComplete={demuxComplete} urlData={urlData}/>
     </div>
-  );
+  )
 }
-    
 
-function Player({folder, demuxRunning, demuxComplete}) {
-  console.log("<player> ", folder, demuxRunning, demuxComplete);
-  
+function Player ({ folder, demuxRunning, demuxComplete }) {
+  console.log('<player> ', folder, demuxRunning, demuxComplete)
+
   const [playEnabled, setPlayEnabled] = useState(false)
-  const stems = ['original', 'bass', 'drums', 'other', 'vocals'];
+  const stems = ['original', 'bass', 'drums', 'other', 'vocals']
   const stemRefs = {
-    'original': useRef(),
-    'bass': useRef(),
-    'drums': useRef(),
-    'other': useRef(),
-    'vocals': useRef()
-  };
-  const readyCountRef = useRef(0);
+    original: useRef(),
+    bass: useRef(),
+    drums: useRef(),
+    other: useRef(),
+    vocals: useRef()
+  }
+  const readyCountRef = useRef(0)
 
   useEffect(() => {
-    () => {};
-    return () =>  Object.values(stemRefs).map(ref => {
-      if (ref.current) { 
+    return () => Object.values(stemRefs).map(ref => {
+      if (ref.current) {
         console.log('destroying')
-        ref.current.stop();
-        ref.current.destroy();
-        setPlayEnabled(false);
-        
+        ref.current.stop()
+        ref.current.destroy()
+        setPlayEnabled(false)
       }
-    });
-  }, []);
-  
+    })
+  }, [])
+
   const handleReady = () => {
-    readyCountRef.current += 1;
-    console.log("ready ", readyCountRef.current, stems.length);
-    if (readyCountRef.current == stems.length) setPlayEnabled(true);
-  };
+    readyCountRef.current += 1
+    console.log('ready ', readyCountRef.current, stems.length)
+    if (readyCountRef.current >= stems.length) setPlayEnabled(true)
+  }
 
   const handlePlayPause = () => {
-    Object.values(stemRefs).map(ref => ref.current.playPause());
+    Object.values(stemRefs).map(ref => ref.current.playPause())
   }
 
   const handleSeek = (seek) => {
     for (const [key, value] of Object.entries(stemRefs)) {
-      if (key !== 'original' && value.current){
-        value.current.seekTo(seek);
+      if (key !== 'original' && value.current) {
+        value.current.seekTo(seek)
       }
     }
   }
 
-  if (!(demuxRunning || demuxComplete)){
-    return null;
-  }
-  else {
+  if (!(demuxRunning || demuxComplete)) {
+    return null
+  } else {
     return (
-      <div className='player'> 
-        
+      <div className='player'>
+
         <div id="stemoriginal">
-          <Stem folder={folder} id="original" label={demuxRunning ? "Demuxing..." : "Original Track"} onReady={handleReady} demuxComplete={demuxComplete} wavesurferRef={stemRefs['original']} handleSeek={handleSeek} />
+          <Stem folder={folder} id="original" label={demuxRunning ? 'Demuxing...' : 'Original Track'} onReady={handleReady} demuxComplete={demuxComplete} wavesurferRef={stemRefs.original} handleSeek={handleSeek} />
         </div>
-  
-        {demuxComplete ? 
-          <div className='stemgroup'>
-            <Stem folder={folder} id='bass' label="Bass" onReady={handleReady} demuxComplete={demuxComplete} wavesurferRef={stemRefs['bass']} handleSeek={()=>{}}/>
-            <Stem folder={folder} id='drums' label="Drums" onReady={handleReady} demuxComplete={demuxComplete} wavesurferRef={stemRefs['drums']} handleSeek={()=>{}}/>
-            <Stem folder={folder} id='other' label="Other" onReady={handleReady} demuxComplete={demuxComplete} wavesurferRef={stemRefs['other']} handleSeek={()=>{}}/>
-            <Stem folder={folder} id='vocals' label="Vocals" onReady={handleReady} demuxComplete={demuxComplete} wavesurferRef={stemRefs['vocals']} handleSeek={()=>{}}/>
+
+        {demuxComplete
+          ? <div className='stemgroup'>
+            <Stem folder={folder} id='bass' label="Bass" onReady={handleReady} demuxComplete={demuxComplete} wavesurferRef={stemRefs.bass} handleSeek={() => {}}/>
+            <Stem folder={folder} id='drums' label="Drums" onReady={handleReady} demuxComplete={demuxComplete} wavesurferRef={stemRefs.drums} handleSeek={() => {}}/>
+            <Stem folder={folder} id='other' label="Other" onReady={handleReady} demuxComplete={demuxComplete} wavesurferRef={stemRefs.other} handleSeek={() => {}}/>
+            <Stem folder={folder} id='vocals' label="Vocals" onReady={handleReady} demuxComplete={demuxComplete} wavesurferRef={stemRefs.vocals} handleSeek={() => {}}/>
           </div>
           : null}
-  
-        <div className='play-btn'>  
-          <PlayPauseButton 
-            onClick={handlePlayPause} 
+
+        <div className='play-btn'>
+          <PlayPauseButton
+            onClick={handlePlayPause}
             disabled={!playEnabled}
           />
         </div>
       </div>
-    );
+    )
   }
 }
 
-
-function Stem(props) {
-  const {folder, id, label, onReady, demuxComplete, wavesurferRef, handleSeek} = props;
-  const url = folder + '/' + id + '.mp3';
+function Stem (props) {
+  const { folder, id, label, onReady, demuxComplete, wavesurferRef, handleSeek } = props
+  const url = folder + '/' + id + '.mp3'
 
   return (
     <div className={'stem ' + id}>
@@ -240,25 +225,24 @@ function Stem(props) {
           min={0} max={1}
           step={0.01}
           defaultValue={0.8}
-          onChange={(e,v) => wavesurferRef.current.setVolume(v)}
+          onChange={(e, v) => wavesurferRef.current.setVolume(v)}
           color="primary"
           aria-labelledby="label"
         />
       </div>
     </div>
-  );
+  )
 }
 
-function PlayPauseButton({onClick, disabled}) {
-  const [playing, setPlaying] = useState(false);
+function PlayPauseButton ({ onClick, disabled }) {
+  const [playing, setPlaying] = useState(false)
 
-  const play_pause = playing ?  <PauseCircleFilledIcon fontSize="inherit"/> : <PlayCircleFilledIcon fontSize="inherit"/>
+  const playPause = playing ? <PauseCircleFilledIcon fontSize="inherit"/> : <PlayCircleFilledIcon fontSize="inherit"/>
   return (
-    <IconButton color="primary" aria-label="play/pause" onClick={() => {onClick(); setPlaying(!playing)}} disabled={disabled}>
-      {play_pause}
+    <IconButton color="primary" aria-label="play/pause" onClick={() => { onClick(); setPlaying(!playing) }} disabled={disabled}>
+      {playPause}
     </IconButton>
-  );
+  )
 }
 
-
-export default App;
+export default App
