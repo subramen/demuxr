@@ -16,7 +16,7 @@ from contextlib import contextmanager
 
 import torch as th
 import tqdm
-from torch import distributed
+from torch import distributed, Tensor
 from torch.nn import functional as F
 
 
@@ -27,8 +27,7 @@ def center_trim(tensor, reference):
     `reference` can also be a number, representing the length to trim to.
     If the size difference != 0 mod 2, the extra sample is removed on the right side.
     """
-    if hasattr(reference, "size"):
-        reference = reference.size(-1)
+    reference = reference.size(-1)
     delta = tensor.size(-1) - reference
     if delta < 0:
         raise ValueError("tensor must be larger than reference. " f"Delta is {delta}.")

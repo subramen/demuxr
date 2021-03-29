@@ -117,7 +117,8 @@ class Demucs(nn.Module):
         if rescale:
             rescale_module(self, reference=rescale)
 
-    def valid_length(self, length):
+    @th.jit.export
+    def valid_length(self, length: int):
         """
         Return the nearest valid length to use with the model so that
         there is no time steps left over in a convolutions, e.g. for all
@@ -153,7 +154,7 @@ class Demucs(nn.Module):
             saved.append(x)
             if self.upsample:
                 x = downsample(x, self.stride)
-        if self.lstm:
+        if self.lstm is not None:
             x = self.lstm(x)
         for decode in self.decoder:
             if self.upsample:
@@ -161,7 +162,7 @@ class Demucs(nn.Module):
             skip = center_trim(saved.pop(-1), x)
             x = x + skip
             x = decode(x)
-        if self.final:
+        if self.final is not None:
             skip = center_trim(saved.pop(-1), x)
             x = th.cat([x, skip], dim=1)
             x = self.final(x)
@@ -198,7 +199,7 @@ def rescale_module(module, reference):
             rescale_conv(sub, reference)
 
 
-def upsample(x, stride):
+def upsample(x, stride: int):
     """
     Linear upsampling, the output will be `stride` times longer.
     """
@@ -209,7 +210,7 @@ def upsample(x, stride):
     return out.reshape(batch, channels, -1)
 
 
-def downsample(x, stride):
+def downsample(x, stride: int):
     """
     Downsample x by decimation.
     """
