@@ -31,7 +31,7 @@ class DemucsHandler(BaseHandler):
         serialized_file = Path(self.manifest['model']['serializedFile'])
         model_sd_path = model_dir / serialized_file
 
-        self.model = torch.jit.load(model_sd_path, map_location='cuda')
+        self.model = torch.jit.load(str(model_sd_path), map_location='cuda')
         self.model.eval()
         self.initialized = True
         logger.info("Model initialized!")
@@ -56,6 +56,7 @@ class DemucsHandler(BaseHandler):
         wav = (wav * 2**15).round() / 2**15
         ref = wav.mean(0)
         wav = (wav - ref.mean()) / ref.std()
+        wav = wav.to(device='cuda')
         logger.info(f"Encoded audio to tensor of shape: {wav.size()}")
         return wav
 

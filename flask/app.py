@@ -106,13 +106,13 @@ def run_demuxr(folder):
     
     mp3_bytes = io.BytesIO()
     s3.download_stem(folder, 'original', mp3_bytes)
-    try:
-        response = requests.post(url=pred_url, data=mp3_bytes.getvalue(), headers={'Content-Type': 'audio/mpeg'})
-    except:
+
+    response = requests.post(url=pred_url, data=mp3_bytes.getvalue(), headers={'Content-Type': 'audio/mpeg'})
+    if response.status_code != 200:
         logger.error(f"Inference request failed with {response.status_code} | {response.text}")
         raise RuntimeError("Torchserve inference failed!")
 
-    logger.debug("Inference done!")
+    logger.info("Inference done!")
     bytebuf = response.content
     n = len(bytebuf)//4
     stems = [bytebuf[i:i+n] for i in range(0, len(bytebuf), n)]
