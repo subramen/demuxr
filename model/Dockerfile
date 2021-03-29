@@ -10,17 +10,16 @@ USER model-server
 COPY . /home/model-server/
 WORKDIR /home/model-server/
 
-RUN aws s3 cp s3://demucs-app-modelstore/demucs_state_dict.pt ./
+RUN aws s3 cp s3://demucs-app-modelstore/demucs_scripted.pt ./
 
 RUN torch-model-archiver \
 --model-name demucs \
 --version 1 \
 --handler handler.py \
---serialized-file demucs_state_dict.pt \
+--serialized-file demucs_scripted.pt \
 --export-path ./model-store \
---model-file model.py \
 -r requirements.txt \
---extra-files audio.py,utils.py,model.py
+--extra-files audio.py,utils.py
 
 CMD ["torchserve", \
 "--start", \

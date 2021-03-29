@@ -9,7 +9,6 @@ from loguru import logger
 # From https://github.com/facebookresearch/demucs/
 from audio import AudioFile, encode_mp3
 from utils import apply_model, load_model
-from model import Demucs
 
 
 class DemucsHandler(BaseHandler):

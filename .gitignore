@@ -11,3 +11,4 @@ package-lock.json
 node_modules*
 .env
 .eslint*
+script_compile.py
