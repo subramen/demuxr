@@ -1,4 +1,4 @@
-FROM pytorch/torchserve:latest-cpu
+FROM pytorch/torchserve:latest-gpu
 
 RUN pip3 install --upgrade pip && \
     pip3 --no-cache-dir install --upgrade awscli 

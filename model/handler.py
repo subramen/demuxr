@@ -31,7 +31,7 @@ class DemucsHandler(BaseHandler):
         serialized_file = Path(self.manifest['model']['serializedFile'])
         model_sd_path = model_dir / serialized_file
 
-        self.model = torch.jit.load(model_sd_path, map_location='cpu')
+        self.model = torch.jit.load(model_sd_path, map_location='cuda')
         self.model.eval()
         self.initialized = True
         logger.info("Model initialized!")
