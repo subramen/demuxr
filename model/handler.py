@@ -76,9 +76,10 @@ class DemucsHandler(BaseHandler):
         out_msg = bytearray()
         for source in inference_output:
             source = (source * 2**15).clamp_(-2**15, 2**15 - 1).short()
-            source = source.transpose(0,1).numpy()
+            source = source.transpose(0,1).cpu().numpy()
             out_msg += encode_mp3(source)
-
+        
+        torch.cuda.empty_cache()
         logger.info(f"Stems encoded to bytearray of length: {len(out_msg)}")
         return [out_msg]
 
