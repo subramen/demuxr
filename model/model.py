@@ -6,7 +6,7 @@
 
 import math
 
-import torch as th
+import torch
 from torch import nn
 
 from utils import capture_init, center_trim
@@ -117,7 +117,7 @@ class Demucs(nn.Module):
         if rescale:
             rescale_module(self, reference=rescale)
 
-    @th.jit.export
+    @torch.jit.export
     def valid_length(self, length: int):
         """
         Return the nearest valid length to use with the model so that
@@ -164,7 +164,7 @@ class Demucs(nn.Module):
             x = decode(x)
         if self.final is not None:
             skip = center_trim(saved.pop(-1), x)
-            x = th.cat([x, skip], dim=1)
+            x = torch.cat([x, skip], dim=1)
             x = self.final(x)
 
         x = x.view(x.size(0), self.sources, self.audio_channels, x.size(-1))
@@ -204,7 +204,7 @@ def upsample(x, stride: int):
     Linear upsampling, the output will be `stride` times longer.
     """
     batch, channels, time = x.size()
-    weight = th.arange(stride, device=x.device, dtype=th.float) / stride
+    weight = torch.arange(stride, device=x.device, dtype=torch.float) / stride
     x = x.view(batch, channels, time, 1)
     out = x[..., :-1, :] * (1 - weight) + x[..., 1:, :] * weight
     return out.reshape(batch, channels, -1)
