@@ -7,8 +7,9 @@ import shutil
 from loguru import logger
 
 # From https://github.com/facebookresearch/demucs/
-from audio import AudioFile, encode_mp3
-from utils import apply_model, load_model
+from .audio import AudioFile, convert_audio_channels
+from .separate import load_track, encode_mp3
+from .utils import apply_model
 
 
 class DemucsHandler(BaseHandler):
@@ -38,7 +39,7 @@ class DemucsHandler(BaseHandler):
 
 
     # From https://github.com/facebookresearch/demucs/blob/dd7a77a0b2600d24168bbe7a40ef67f195586b62/demucs/separate.py#L199
-    def preprocess(self, data, track_folder):
+    def preprocess(self, data, tmp_folder):
         """
         Transform raw input into model input data.
         track: audio file
@@ -48,24 +49,22 @@ class DemucsHandler(BaseHandler):
         audio = inp.get('data') or inp.get('body')
         logger.info(f"Received audio of length: {len(audio)}")
 
-        track_path = track_folder / 'input.mp3'
+        track_path = tmp_folder / 'input.mp3'
         with open(track_path, 'wb') as f:
             f.write(audio)
 
-        wav = AudioFile(track_path).read(streams=0, samplerate=44100, channels=2)
-        wav = (wav * 2**15).round() / 2**15
+        wav = load_track(track_path, device='cuda', audio_channels=2, samplerate=44100)
         ref = wav.mean(0)
         wav = (wav - ref.mean()) / ref.std()
-        wav = wav.to(device='cuda')
         logger.info(f"Encoded audio to tensor of shape: {wav.size()}")
-        return wav
+        return wav, ref
 
 
-    def inference(self, wav: torch.Tensor) -> torch.Tensor:
+    def inference(self, wav: torch.Tensor, ref: torch.Tensor) -> torch.Tensor:
         if self.model is None:
             raise RuntimeError("Model not initialized")
-        logger.info("Starting inference...")
-        stem_tensor = apply_model(self.model, wav, split=True, progress=True)
+        stem_tensor = apply_model(self.model, wav, split=False)
+        stem_tensor = stem_tensor * ref.std() + ref.mean()
         logger.info(f"Inference complete. Shape of sources: {stem_tensor.size()}")
         return stem_tensor
 
@@ -75,21 +74,26 @@ class DemucsHandler(BaseHandler):
         logger.info("Encoding stems...")
         out_msg = bytearray()
         for source in inference_output:
+            source = source / max(1.01 * source.abs().max(), 1)
             source = (source * 2**15).clamp_(-2**15, 2**15 - 1).short()
-            source = source.transpose(0,1).cpu().numpy()
-            out_msg += encode_mp3(source)
-        
+            source = source.cpu()
+            out_msg += encode_mp3(source, path=None, bitrate=128)
         torch.cuda.empty_cache()
         logger.info(f"Stems encoded to bytearray of length: {len(out_msg)}")
         return [out_msg]
 
 
     def handle(self, data, context):
-        track_folder = self.filedir / str(uuid.uuid4())
-        track_folder.mkdir(parents=True)
-        wav = self.preprocess(data, track_folder)
-        shutil.rmtree(track_folder)
-        stems = self.inference(wav)
-        return self.postprocess(stems)
+        tmp_folder = self.filedir / str(uuid.uuid4())
+        tmp_folder.mkdir(parents=True)
+        
+        wav, ref = self.preprocess(data, tmp_folder)
+        shutil.rmtree(tmp_folder)
+        
+        stems = self.inference(wav, ref)
+        
+        out = self.postprocess(stems)
+        
+        return out
 
 

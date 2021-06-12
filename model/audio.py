@@ -6,33 +6,12 @@
 import json
 import subprocess as sp
 from pathlib import Path
-import sys
+
+import julius
 import numpy as np
 import torch
 
-from utils import temp_filenames
-
-
-def encode_mp3(wav, verbose=False):
-    try:
-        import lameenc
-    except ImportError:
-        print("Failed to call lame encoder. Maybe it is not installed? "
-              "On windows, run `python.exe -m pip install -U lameenc`, "
-              "on OSX/Linux, run `python3 -m pip install -U lameenc`, "
-              "then try again.", file=sys.stderr)
-        sys.exit(1)
-    encoder = lameenc.Encoder()
-    encoder.set_bit_rate(320)
-    encoder.set_in_sample_rate(44100)
-    encoder.set_channels(2)
-    encoder.set_quality(2)  # 2-highest, 7-fastest
-    if not verbose:
-        encoder.silence()
-    mp3_data = encoder.encode(wav.tostring())
-    mp3_data += encoder.flush()
-    return mp3_data
-
+from .utils import temp_filenames
 
 
 def _read_info(path):
@@ -92,7 +71,7 @@ class AudioFile:
              streams=slice(None),
              samplerate=None,
              channels=None,
-             temp_folder=None)  -> torch.Tensor:
+             temp_folder=None):
         """
         Slightly more efficient implementation than stempeg,
         in particular, this will extract all stems at once
@@ -151,26 +130,8 @@ class AudioFile:
                 wav = np.fromfile(filename, dtype=np.float32)
                 wav = torch.from_numpy(wav)
                 wav = wav.view(-1, self.channels()).t()
-                if channels == 1:
-                    # Case 1:
-                    # The caller asked 1-channel audio, but the stream have multiple
-                    # channels, downmix all channels.
-                    # We do mono convertion here as ffmpeg mess up the volume of mono output
-                    # otherwise. See https://sound.stackexchange.com/a/42710.
-                    wav = wav.mean(dim=0, keepdim=True)
-                elif self.channels() == 1 and channels != 1:
-                    # Case 2:
-                    # The caller asked for multiple channels, but the input file have
-                    # one single channel, replicate the audio over all channels.
-                    wav = wav.as_strided(size=(channels, wav.shape[1]), stride=(0, 1))
-                elif self.channels() >= channels:
-                    # Case 3:
-                    # The caller asked for multiple channels, and the input file have
-                    # more channels than requested. In that case return the first channels.
-                    wav = wav[:channels, :]
-                else:
-                    # Case 4: What is a reasonable choice here?
-                    raise ValueError('The input file has less channels than requested')
+                if channels is not None:
+                    wav = convert_audio_channels(wav, channels)
                 if target_size is not None:
                     wav = wav[..., :target_size]
                 wavs.append(wav)
@@ -178,3 +139,34 @@ class AudioFile:
         if single:
             wav = wav[0]
         return wav
+
+
+def convert_audio_channels(wav, channels=2):
+    """Convert audio to the given number of channels."""
+    *shape, src_channels, length = wav.shape
+    if src_channels == channels:
+        pass
+    elif channels == 1:
+        # Case 1:
+        # The caller asked 1-channel audio, but the stream have multiple
+        # channels, downmix all channels.
+        wav = wav.mean(dim=-2, keepdim=True)
+    elif src_channels == 1:
+        # Case 2:
+        # The caller asked for multiple channels, but the input file have
+        # one single channel, replicate the audio over all channels.
+        wav = wav.expand(*shape, channels, length)
+    elif src_channels >= channels:
+        # Case 3:
+        # The caller asked for multiple channels, and the input file have
+        # more channels than requested. In that case return the first channels.
+        wav = wav[..., :channels, :]
+    else:
+        # Case 4: What is a reasonable choice here?
+        raise ValueError('The audio file has less channels than requested but is not mono.')
+    return wav
+
+
+def convert_audio(wav, from_samplerate, to_samplerate, channels):
+    wav = convert_audio_channels(wav, channels)
+    return julius.resample_frac(wav, from_samplerate, to_samplerate)

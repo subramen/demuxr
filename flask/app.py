@@ -68,8 +68,10 @@ def youtubedl(url, download=True):
         'postprocessors': [{
             'key': 'FFmpegExtractAudio',
             'preferredcodec': 'mp3',
-            'preferredquality': '192',}]
-        }
+            'preferredquality': '128',}],
+        # 'postprocessor_args': [
+        #     '-ar', '44100'],
+    }
 
     with youtube_dl.YoutubeDL(ydl_opts) as ydl:
         # get video info like id, title

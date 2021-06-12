@@ -18,7 +18,7 @@ const Button = styled(MuiButton)(spacing)
 
 function App () {
   const [sessId, setSessId] = useState(0)
-  const [urlData, setUrlData] = useState({})
+  const [videoMetaData, setVideoMetaData] = useState({})
   
   // App states:
   const [isStart, setIsStart] = useState(false)
@@ -34,7 +34,7 @@ function App () {
     console.log(sessId)
   })
 
-  const fetchURLInfo = useCallback((url) => {
+  const fetchVideoMetadata = useCallback((url) => {
     console.log('fetching info for url ', url, '...')
     return fetch(INFO_API + url).then(response => response.json())
   })
@@ -47,9 +47,9 @@ function App () {
   function runDemuxr (url) {
     setIsStart(true)
 
-    fetchURLInfo(url)
+    fetchVideoMetadata(url)
       .then(data => {
-        setUrlData(data)
+        setVideoMetaData(data)
       })
       .then(() => {
         setIsStart(false)
@@ -76,13 +76,13 @@ function App () {
       <div className="wrapper">
         <UserInput
         runDemuxr={runDemuxr}
-        urlData={urlData}
+        videoMetaData={videoMetaData}
         isStart={isStart}
         demuxRunning={demuxRunning}
         demuxComplete={demuxComplete}
         resetStates={resetStates}/>
 
-        <Player key={sessId} folder={urlData.folder} demuxRunning={demuxRunning} demuxComplete={demuxComplete} />
+        <Player key={sessId} folder={videoMetaData.folder} demuxRunning={demuxRunning} demuxComplete={demuxComplete} />
 
         <footer className="footer">
           <Typography variant="h6">
@@ -95,13 +95,13 @@ function App () {
 }
 
 function Status (props) {
-  const { isStart, demuxRunning, demuxComplete, urlData } = props
+  const { isStart, demuxRunning, demuxComplete, videoMetaData } = props
 
   let elt = null
   if (isStart) {
     elt = <LinearProgress color="secondary" variant="indeterminate" />
   } else if (demuxRunning) {
-    const msg = 'Running demuxr ' + (urlData.title ? 'on ' + urlData.title : '')
+    const msg = 'Running demuxr ' + (videoMetaData.title ? 'on ' + videoMetaData.title : '')
     elt = <Typography color="secondary"> {msg} </Typography>
   } else if (demuxComplete) {
     elt = <Typography color="secondary">Ready to play!</Typography>
@@ -109,7 +109,7 @@ function Status (props) {
   return (<div className="status">{elt}</div>)
 }
 
-function UserInput ({ runDemuxr, urlData, isStart, demuxRunning, demuxComplete, resetStates }) {
+function UserInput ({ runDemuxr, videoMetaData, isStart, demuxRunning, demuxComplete, resetStates }) {
   const urlInputRef = useRef()
 
   const handleSubmit = (e) => {
@@ -129,7 +129,7 @@ function UserInput ({ runDemuxr, urlData, isStart, demuxRunning, demuxComplete, 
       <div className="btn-go">
         <Button onClick={handleSubmit} px="45px" variant="contained" color="primary">Go</Button>
       </div>
-      <Status isStart={isStart} demuxRunning={demuxRunning} demuxComplete={demuxComplete} urlData={urlData}/>
+      <Status isStart={isStart} demuxRunning={demuxRunning} demuxComplete={demuxComplete} videoMetaData={videoMetaData}/>
     </div>
   )
 }
