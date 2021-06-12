@@ -8,7 +8,7 @@ import React, {
   import { WaveSurfer, WaveForm } from "wavesurfer-react";
   import TimelinePlugin from "wavesurfer.js/dist/plugin/wavesurfer.timeline.min";
   
-  
+  // with a little help from my friends at https://codesandbox.io/s/wavesurfer-react-20-gqvb6
   export default function AudioWave( {url, id, demuxComplete, onReady, wavesurferRef, handleSeek} ) {
     const buffer = 1600;
     const [timelineVis, setTimelineVis] = useState(true);

@@ -19,9 +19,20 @@ const Button = styled(MuiButton)(spacing)
 function App () {
   const [sessId, setSessId] = useState(0)
   const [urlData, setUrlData] = useState({})
+  
+  // App states:
   const [isStart, setIsStart] = useState(false)
   const [demuxRunning, setDemuxRunning] = useState(false)
   const [demuxComplete, setDemuxComplete] = useState(false)
+
+  const resetStates = useCallback(() => {
+    console.log('resetting from ', isStart, demuxRunning, demuxComplete)
+    setIsStart(false)
+    setDemuxRunning(false)
+    setDemuxComplete(false)
+    setSessId(Date.now())
+    console.log(sessId)
+  })
 
   const fetchURLInfo = useCallback((url) => {
     console.log('fetching info for url ', url, '...')
@@ -31,15 +42,6 @@ function App () {
   const fetchInference = useCallback((url) => {
     console.log('running inference for url', url, '...')
     return fetch(INFER_API + url, 1200000).then(response => response.json())
-  })
-
-  const resetStates = useCallback(() => {
-    console.log('resetting from ', isStart, demuxRunning, demuxComplete)
-    setIsStart(false)
-    setDemuxRunning(false)
-    setDemuxComplete(false)
-    setSessId(Date.now())
-    console.log(sessId)
   })
 
   function runDemuxr (url) {
