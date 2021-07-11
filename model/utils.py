@@ -145,71 +145,56 @@ def tensor_chunk(tensor_or_chunk):
         return TensorChunk(tensor_or_chunk)
 
 
-def apply_model(model, mix, shifts=None, split=False,
-                overlap=0.25, transition_power=1., progress=False):
-    """
-    Apply model to a given mixture.
 
-    Args:
-        shifts (int): if > 0, will shift in time `mix` by a random amount between 0 and 0.5 sec
-            and apply the oppositve shift to the output. This is repeated `shifts` time and
-            all predictions are averaged. This effectively makes the model time equivariant
-            and improves SDR by up to 0.2 points.
-        split (bool): if True, the input will be broken down in 8 seconds extracts
-            and predictions will be performed individually on each and concatenated.
-            Useful for model with large memory footprint like Tasnet.
-        progress (bool): if True, show a progress bar (requires split=True)
-    """
-    assert transition_power >= 1, "transition_power < 1 leads to weird behavior."
+def apply_model(model, mix, max_batch_sz=None, overlap=0.25, transition_power=1.):
+    SEG_LEN = model.segment_length // 4
+    channels, total_length = mix.size()
     device = mix.device
-    channels, length = mix.shape
-    if split:
-        out = th.zeros(len(model.sources), channels, length, device=device)
-        sum_weight = th.zeros(length, device=device)
-        segment = model.segment_length
-        stride = int((1 - overlap) * segment)
-        offsets = range(0, length, stride)
-        scale = stride / model.samplerate
-        if progress:
-            offsets = tqdm.tqdm(offsets, unit_scale=scale, ncols=120, unit='seconds')
-        # We start from a triangle shaped weight, with maximal weight in the middle
-        # of the segment. Then we normalize and take to the power `transition_power`.
-        # Large values of transition power will lead to sharper transitions.
-        weight = th.cat([th.arange(1, segment // 2 + 1),
-                         th.arange(segment - segment // 2, 0, -1)]).to(device)
-        assert len(weight) == segment
-        # If the overlap < 50%, this will translate to linear transition when
-        # transition_power is 1.
+    mix.unsqueeze_(0)
+
+    def merge_segments(out_segments, offsets):
+        out = th.zeros(4, channels, total_length, device=device)
+        weight = th.cat([th.arange(1, SEG_LEN // 2 + 1), \
+            th.arange(SEG_LEN - SEG_LEN // 2, 0, -1)]).to(device)
         weight = (weight / weight.max())**transition_power
-        for offset in offsets:
-            chunk = TensorChunk(mix, offset, segment)
-            chunk_out = apply_model(model, chunk, shifts=shifts)
-            chunk_length = chunk_out.shape[-1]
-            out[..., offset:offset + segment] += weight[:chunk_length] * chunk_out
-            sum_weight[offset:offset + segment] += weight[:chunk_length]
-            offset += segment
-        assert sum_weight.min() > 0
+        sum_weight = th.zeros(total_length, device=device)
+        for i, out_seg in enumerate(out_segments):
+            offset = offsets[i]
+            end_ix = min(SEG_LEN, total_length - offset)
+            out[..., offset:offset + SEG_LEN] += (out_seg * weight)[..., :end_ix]
+            sum_weight[offset:offset + SEG_LEN] += weight[:end_ix]
         out /= sum_weight
         return out
-    elif shifts:
-        max_shift = int(0.5 * model.samplerate)
-        mix = tensor_chunk(mix)
-        padded_mix = mix.padded(length + 2 * max_shift)
-        out = 0
-        for _ in range(shifts):
-            offset = random.randint(0, max_shift)
-            shifted = TensorChunk(padded_mix, offset, length + max_shift - offset)
-            shifted_out = apply_model(model, shifted)
-            out += shifted_out[..., max_shift - offset:]
-        out /= shifts
-        return out
-    else:
-        valid_length = model.valid_length(length)
-        mix = tensor_chunk(mix)
-        padded_mix = mix.padded(valid_length)
-        with th.no_grad():
-            out = model(padded_mix.unsqueeze(0))[0]
-        return center_trim(out, length)
+    
+
+    def batch_infer(model, seg_list, out_length=None, batch_sz=None):
+        def infer(inp, length):
+            print('model input size ', inp.size())
+            with th.no_grad():
+                x = model(inp)
+                x.detach()
+                if length:
+                    print('trimming')
+                    x = center_trim(x, length)
+            print('model output size ', x.size())
+            return x
+
+        chunked_input = th.vstack(seg_list)
+        batched_input = th.split(chunked_input, batch_sz) if batch_sz else (chunked_input, )
+        chunked_output = th.vstack([infer(inp, out_length) for inp in batched_input])
+        return chunked_output
+
+    seg_list = []
+    stride = int((1 - overlap) * SEG_LEN) 
+    offsets = range(0, total_length, stride)
+    valid_seg_len = model.valid_length(SEG_LEN)
+    for offset in offsets:
+        seg =  TensorChunk(mix, offset, SEG_LEN).padded(valid_seg_len)
+        seg_list.append(seg)
+    
+    model_out = batch_infer(model, seg_list, SEG_LEN, max_batch_sz)
+    stems = merge_segments(model_out, offsets)
+    return stems
 
 
 @contextmanager

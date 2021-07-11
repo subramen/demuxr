@@ -4,3 +4,4 @@ build
 Dockerfile
 Dockerfile.prod
 .git
+.th

@@ -61,7 +61,7 @@ function App () {
           setDemuxRunning(false)
           setDemuxComplete(true)
         } else {
-          throw new Error('Demuxr failed, HTTP:', data.status)
+          throw new Error('Inference failed, HTTP:', data.status)
         }
         return data.status
       })
@@ -86,7 +86,7 @@ function App () {
 
         <footer className="footer">
           <Typography variant="h6">
-            Made with &#127927; by <a href="https://github.com/suraj813/karaoke" target="_blank" rel="noreferrer noopener">suraj813</a>
+            Made with &#127927; by <a href="https://github.com/suraj813/demuxr" target="_blank" rel="noreferrer noopener">suraj813</a>
           </Typography>
         </footer>
       </div>

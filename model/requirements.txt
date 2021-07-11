@@ -1,2 +1,6 @@
 lameenc==1.2.2
 loguru
+diffq
+boto3
+torchaudio
+julius

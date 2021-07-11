@@ -1,24 +1,26 @@
 import torch
+import torchaudio as ta
 from ts.torch_handler.base_handler import BaseHandler
 from pathlib import Path
 import uuid
-import json
-import shutil
 from loguru import logger
+from diffq import DiffQuantizer
+import io
+import json
+import boto3
 
 # From https://github.com/facebookresearch/demucs/
-from .audio import AudioFile, convert_audio_channels
-from .separate import load_track, encode_mp3
-from .utils import apply_model
+from utils import apply_model, set_state
+from model import Demucs
 
 
 class DemucsHandler(BaseHandler):
-
     def __init__(self):
         self.model = None
-        self.initialized = False
         self.filedir = Path("filedir")
         self.filedir.mkdir(exist_ok=True)
+        self.s3_client = boto3.client('s3')
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     def initialize(self, ctx):
         """
@@ -28,72 +30,63 @@ class DemucsHandler(BaseHandler):
         """
         self.manifest = ctx.manifest
         properties = ctx.system_properties
-        model_dir = Path(properties.get("model_dir"))
-        serialized_file = Path(self.manifest['model']['serializedFile'])
-        model_sd_path = model_dir / serialized_file
-
-        self.model = torch.jit.load(str(model_sd_path), map_location='cuda')
+        model_weights_path = Path(properties.get("model_dir")) / Path(self.manifest['model']['serializedFile'])
+        
+        state = torch.load(model_weights_path)
+        self.model = Demucs([1,1,1,1]).to(self.device)
+        quantizer = DiffQuantizer(self.model, group_size=8, min_size=1)
+        set_state(self.model, quantizer, state)
+        quantizer.detach() 
         self.model.eval()
-        self.initialized = True
-        logger.info("Model initialized!")
+        logger.info("loaded model")
+    
 
-
-    # From https://github.com/facebookresearch/demucs/blob/dd7a77a0b2600d24168bbe7a40ef67f195586b62/demucs/separate.py#L199
-    def preprocess(self, data, tmp_folder):
+    def preprocess(self, inp):
         """
         Transform raw input into model input data.
         track: audio file
         :return: tensor of normalized audio
         """
-        inp = data[0]
-        audio = inp.get('data') or inp.get('body')
-        logger.info(f"Received audio of length: {len(audio)}")
-
-        track_path = tmp_folder / 'input.mp3'
-        with open(track_path, 'wb') as f:
-            f.write(audio)
-
-        wav = load_track(track_path, device='cuda', audio_channels=2, samplerate=44100)
+        if isinstance(inp, (bytes, bytearray)):
+            audio_obj = io.BytesIO(inp)
+        elif isinstance(inp, dict):
+            audio_obj = self.s3_client.get_object(Bucket=inp['Bucket'], Key=inp['Key'])['Body']
+        else:
+            raise RuntimeError(f"Expected input of type bytes or dict, received {type(inp)}")
+        
+        wav, _ = ta.load(audio_obj, format='mp3')
+        wav = wav.to(self.device)
         ref = wav.mean(0)
         wav = (wav - ref.mean()) / ref.std()
-        logger.info(f"Encoded audio to tensor of shape: {wav.size()}")
         return wav, ref
 
 
-    def inference(self, wav: torch.Tensor, ref: torch.Tensor) -> torch.Tensor:
+    def inference(self, wav, ref):
         if self.model is None:
             raise RuntimeError("Model not initialized")
-        stem_tensor = apply_model(self.model, wav, split=False)
+        stem_tensor = apply_model(self.model, wav, 8)
         stem_tensor = stem_tensor * ref.std() + ref.mean()
-        logger.info(f"Inference complete. Shape of sources: {stem_tensor.size()}")
         return stem_tensor
 
-
+   
     # From https://github.com/facebookresearch/demucs/blob/dd7a77a0b2600d24168bbe7a40ef67f195586b62/demucs/separate.py#L207
     def postprocess(self, inference_output) -> Path:
         logger.info("Encoding stems...")
         out_msg = bytearray()
         for source in inference_output:
-            source = source / max(1.01 * source.abs().max(), 1)
+            source = source / max(1.01 * source.abs().max(), 1)  # source.max(dim=1).values.max(dim=-1)
             source = (source * 2**15).clamp_(-2**15, 2**15 - 1).short()
             source = source.cpu()
-            out_msg += encode_mp3(source, path=None, bitrate=128)
-        torch.cuda.empty_cache()
+            mp3_buf = io.BytesIO()
+            ta.save(mp3_buf, source, 44100, compression=128.3, format='mp3')
+            out_msg += mp3_buf.getvalue()
         logger.info(f"Stems encoded to bytearray of length: {len(out_msg)}")
         return [out_msg]
 
 
     def handle(self, data, context):
-        tmp_folder = self.filedir / str(uuid.uuid4())
-        tmp_folder.mkdir(parents=True)
-        
-        wav, ref = self.preprocess(data, tmp_folder)
-        shutil.rmtree(tmp_folder)
-        
+        inp = data[0].get('data') or data[0].get('body') 
+        wav, ref = self.preprocess(inp)
         stems = self.inference(wav, ref)
-        
-        out = self.postprocess(stems)
-        
+        out = self.postprocess(stems)        
         return out
-
-

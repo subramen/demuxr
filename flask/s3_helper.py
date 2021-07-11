@@ -32,24 +32,37 @@ def grep(folder, stem=None):
     return True
 
 # upload to s3
-def upload_stem(mp3_bytes, folder, stem, force=False):
+def upload_stemobj(mp3_bytes, folder, stem, force=False):
     if grep(folder, stem) and not force:
         logger.info("File exists! Not overwriting")    
-        return 
+    else:
+        key = f"{folder}/{stem}.mp3"
+        logger.info(f'Uploading {key}')
+        S3_CLIENT.upload_fileobj(io.BytesIO(mp3_bytes), BUCKET, key, ExtraArgs={'ACL':'public-read'})
+    
+    return (BUCKET, key)
 
-    object_name = f"{folder}/{stem}.mp3"
-    logger.info(f'Uploading {object_name}')
-    S3_CLIENT.upload_fileobj(io.BytesIO(mp3_bytes), BUCKET, object_name, ExtraArgs={'ACL':'public-read'})
+def upload_stem(path, force=False):
+    folder, stem = path.parts[-2:]
+    if grep(folder, stem) and not force:
+        logger.info("File exists! Not overwriting")    
+    else:
+        key = f"{folder}/{stem}"
+        logger.info(f'Uploading {key}')
+        S3_CLIENT.upload_file(str(path), BUCKET, key, ExtraArgs={'ACL':'public-read'})
+    
+    return (BUCKET, key)
+
 
 def download_stem(folder, stem, fileobj):
-    object_name = f"{folder}/{stem}.mp3"
+    key = f"{folder}/{stem}.mp3"
 
     if not grep(folder, stem):
-        logger.info(f"File {object_name} not found in S3!")    
+        logger.info(f"File {key} not found in S3!")    
         return 
 
-    logger.info(f'Downloading {object_name}')
-    S3_CLIENT.download_fileobj(BUCKET, object_name, fileobj)
+    logger.info(f'Downloading {key}')
+    S3_CLIENT.download_fileobj(BUCKET, key, fileobj)
     
 
 def get_url(folder):
