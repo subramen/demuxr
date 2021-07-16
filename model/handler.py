@@ -8,11 +8,21 @@ from diffq import DiffQuantizer
 import io
 import json
 import boto3
+import time
 
 # From https://github.com/facebookresearch/demucs/
-from utils import apply_model, set_state
 from model import Demucs
+from utils import load_model, apply_model
 
+def hacky_read_ogg(s3, inp):
+    """torchaudio has a bug where it cannot read an ogg file-like object, so we write it to disk and delete after reading"""
+    import uuid, os
+    tmp = str(uuid.uuid1())
+    s3.download_file(inp['Bucket'], inp['Key'], tmp)
+    wav, _ = ta.load(tmp, format='ogg')
+    assert wav.size(-1) > 0
+    os.remove(tmp)
+    return wav
 
 class DemucsHandler(BaseHandler):
     def __init__(self):
@@ -21,6 +31,7 @@ class DemucsHandler(BaseHandler):
         self.filedir.mkdir(exist_ok=True)
         self.s3_client = boto3.client('s3')
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
 
     def initialize(self, ctx):
         """
@@ -31,15 +42,9 @@ class DemucsHandler(BaseHandler):
         self.manifest = ctx.manifest
         properties = ctx.system_properties
         model_weights_path = Path(properties.get("model_dir")) / Path(self.manifest['model']['serializedFile'])
+        model = Demucs([1,1,1,1]).to(self.device)
+        self.model = load_model(model, model_weights_path, True)
         
-        state = torch.load(model_weights_path)
-        self.model = Demucs([1,1,1,1]).to(self.device)
-        quantizer = DiffQuantizer(self.model, group_size=8, min_size=1)
-        set_state(self.model, quantizer, state)
-        quantizer.detach() 
-        self.model.eval()
-        logger.info("loaded model")
-    
 
     def preprocess(self, inp):
         """
@@ -47,46 +52,76 @@ class DemucsHandler(BaseHandler):
         track: audio file
         :return: tensor of normalized audio
         """
-        if isinstance(inp, (bytes, bytearray)):
+        s3_folder = None
+        if isinstance(inp, (bytes, bytearray)):  # deprecated
             audio_obj = io.BytesIO(inp)
         elif isinstance(inp, dict):
-            audio_obj = self.s3_client.get_object(Bucket=inp['Bucket'], Key=inp['Key'])['Body']
+            logger.info(f"Downloading input audio from {inp}")
+            # audio_obj = self.s3_client.get_object(Bucket=inp['Bucket'], Key=inp['Key'])['Body']
+            wav = hacky_read_ogg(self.s3_client, inp)
+            s3_folder = (inp['Bucket'], inp['Key'].split('/')[0])
         else:
             raise RuntimeError(f"Expected input of type bytes or dict, received {type(inp)}")
         
-        wav, _ = ta.load(audio_obj, format='mp3')
+        # wav, _ = ta.load(audio_obj, format='ogg')
         wav = wav.to(self.device)
         ref = wav.mean(0)
         wav = (wav - ref.mean()) / ref.std()
-        return wav, ref
+        logger.info(f"Processed audio into tensor of size {wav.size()}")
+        return wav, ref, s3_folder
 
 
     def inference(self, wav, ref):
         if self.model is None:
             raise RuntimeError("Model not initialized")
-        stem_tensor = apply_model(self.model, wav, 8)
-        stem_tensor = stem_tensor * ref.std() + ref.mean()
-        return stem_tensor
+        demuxed = apply_model(self.model, wav, 8)
+        demuxed = demuxed * ref.std() + ref.mean()
+        return demuxed
 
-   
+
     # From https://github.com/facebookresearch/demucs/blob/dd7a77a0b2600d24168bbe7a40ef67f195586b62/demucs/separate.py#L207
     def postprocess(self, inference_output) -> Path:
-        logger.info("Encoding stems...")
-        out_msg = bytearray()
+        stems = []
         for source in inference_output:
             source = source / max(1.01 * source.abs().max(), 1)  # source.max(dim=1).values.max(dim=-1)
             source = (source * 2**15).clamp_(-2**15, 2**15 - 1).short()
             source = source.cpu()
-            mp3_buf = io.BytesIO()
-            ta.save(mp3_buf, source, 44100, compression=128.3, format='mp3')
-            out_msg += mp3_buf.getvalue()
-        logger.info(f"Stems encoded to bytearray of length: {len(out_msg)}")
-        return [out_msg]
+            stems.append(source)
+        return stems
+
+
+    def cache(self, stems, s3_folder):
+        bucket, folder = s3_folder
+        source_names = ["drums", "bass", "other", "vocals"]
+        for name, stem in zip(source_names, stems):
+            fmt = 'ogg'
+            key = folder + '/' + name + '.' + fmt
+            with io.BytesIO() as buf_:
+                ta.save(buf_, stem, 44100, format=fmt)
+                buf_.seek(0)
+                self.s3_client.upload_fileobj(buf_, bucket, key, ExtraArgs={'ACL':'public-read'})
 
 
     def handle(self, data, context):
         inp = data[0].get('data') or data[0].get('body') 
-        wav, ref = self.preprocess(inp)
-        stems = self.inference(wav, ref)
-        out = self.postprocess(stems)        
-        return out
+        
+        tic = time.time()
+        wav, ref, s3_folder = self.preprocess(inp)
+        logger.info(f'preprocess took  {time.time()-tic}')
+        
+        tic = time.time()
+        out = self.inference(wav, ref)
+        logger.info(f'inference took  {time.time()-tic}')
+        
+        tic = time.time()
+        stems = self.postprocess(out)        
+        logger.info(f'postprocess took {time.time()-tic}')
+    
+        tic = time.time()
+        self.cache(stems, s3_folder)
+        logger.info(f'caching took {time.time()-tic}')
+
+        result = {"Bucket": s3_folder[0], "Folder": s3_folder[1]}
+
+        return [result]
+

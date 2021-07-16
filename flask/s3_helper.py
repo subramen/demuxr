@@ -6,64 +6,28 @@ import io
 BUCKET = 'demucs-app-cache'
 S3_CLIENT = boto3.client('s3')
 
-# ls
-def ls():
-    """
-    return cached demuxed IDs
-    """
-    contents = [d['Prefix'].split('/vocals.mp3')[0] for d in S3_CLIENT.list_objects_v2(Bucket=BUCKET, Delimiter='/vocals.mp3')['CommonPrefixes']]
-    return contents
 
-
-def grep(folder, stem=None):
-    """
-    returns true if folder (or folder/stem.mp3) exists
-    """
-    if stem == None:
-        return folder in ls()
-    if stem[-4:] != '.mp3': 
-        stem += '.mp3'
+def grep(obj):
     try:
-        S3_CLIENT.head_object(Bucket=BUCKET, Key=f"{folder}/{stem}")
+        S3_CLIENT.head_object(Bucket=BUCKET, Key=obj)
     except ClientError:
-        logger.info(f"{folder}/{stem} not found in cache")
+        logger.info(f"{obj} not found in cache")
         return False
-    logger.info(f"{folder}/{stem} found in cache")
+    logger.info(f"{obj} found in cache")
     return True
 
-# upload to s3
-def upload_stemobj(mp3_bytes, folder, stem, force=False):
-    if grep(folder, stem) and not force:
-        logger.info("File exists! Not overwriting")    
-    else:
-        key = f"{folder}/{stem}.mp3"
-        logger.info(f'Uploading {key}')
-        S3_CLIENT.upload_fileobj(io.BytesIO(mp3_bytes), BUCKET, key, ExtraArgs={'ACL':'public-read'})
-    
-    return (BUCKET, key)
 
 def upload_stem(path, force=False):
     folder, stem = path.parts[-2:]
-    if grep(folder, stem) and not force:
+    key = f"{folder}/{stem}"
+    if grep(key) and not force:
         logger.info("File exists! Not overwriting")    
     else:
-        key = f"{folder}/{stem}"
         logger.info(f'Uploading {key}')
         S3_CLIENT.upload_file(str(path), BUCKET, key, ExtraArgs={'ACL':'public-read'})
     
     return (BUCKET, key)
 
-
-def download_stem(folder, stem, fileobj):
-    key = f"{folder}/{stem}.mp3"
-
-    if not grep(folder, stem):
-        logger.info(f"File {key} not found in S3!")    
-        return 
-
-    logger.info(f'Downloading {key}')
-    S3_CLIENT.download_fileobj(BUCKET, key, fileobj)
-    
 
 def get_url(folder):
     return f'http://{BUCKET}.s3.amazonaws.com/{folder}'

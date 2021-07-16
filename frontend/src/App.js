@@ -18,7 +18,8 @@ const Button = styled(MuiButton)(spacing)
 
 function App () {
   const [sessId, setSessId] = useState(0)
-  const [videoMetaData, setVideoMetaData] = useState({})
+  const [videoTitle, setVideoTitle] = useState("")
+  const [s3Folder, setS3Folder] = useState("")
   
   // App states:
   const [isStart, setIsStart] = useState(false)
@@ -34,7 +35,7 @@ function App () {
     console.log(sessId)
   })
 
-  const fetchVideoMetadata = useCallback((url) => {
+  const fetchVideoInfo = useCallback((url) => {
     console.log('fetching info for url ', url, '...')
     return fetch(INFO_API + url).then(response => response.json())
   })
@@ -47,9 +48,10 @@ function App () {
   function runDemuxr (url) {
     setIsStart(true)
 
-    fetchVideoMetadata(url)
+    fetchVideoInfo(url)
       .then(data => {
-        setVideoMetaData(data)
+        setVideoTitle(data.title)
+        setS3Folder(data.s3_folder)
       })
       .then(() => {
         setIsStart(false)
@@ -76,13 +78,13 @@ function App () {
       <div className="wrapper">
         <UserInput
         runDemuxr={runDemuxr}
-        videoMetaData={videoMetaData}
+        videoTitle={videoTitle}
         isStart={isStart}
         demuxRunning={demuxRunning}
         demuxComplete={demuxComplete}
         resetStates={resetStates}/>
 
-        <Player key={sessId} folder={videoMetaData.folder} demuxRunning={demuxRunning} demuxComplete={demuxComplete} />
+        <Player key={sessId} folder={s3Folder} demuxRunning={demuxRunning} demuxComplete={demuxComplete} />
 
         <footer className="footer">
           <Typography variant="h6">
@@ -94,22 +96,8 @@ function App () {
   )
 }
 
-function Status (props) {
-  const { isStart, demuxRunning, demuxComplete, videoMetaData } = props
 
-  let elt = null
-  if (isStart) {
-    elt = <LinearProgress color="secondary" variant="indeterminate" />
-  } else if (demuxRunning) {
-    const msg = 'Running demuxr ' + (videoMetaData.title ? 'on ' + videoMetaData.title : '')
-    elt = <Typography color="secondary"> {msg} </Typography>
-  } else if (demuxComplete) {
-    elt = <Typography color="secondary">Ready to play!</Typography>
-  }
-  return (<div className="status">{elt}</div>)
-}
-
-function UserInput ({ runDemuxr, videoMetaData, isStart, demuxRunning, demuxComplete, resetStates }) {
+function UserInput ({ runDemuxr, videoTitle, isStart, demuxRunning, demuxComplete, resetStates }) {
   const urlInputRef = useRef()
 
   const handleSubmit = (e) => {
@@ -129,9 +117,25 @@ function UserInput ({ runDemuxr, videoMetaData, isStart, demuxRunning, demuxComp
       <div className="btn-go">
         <Button onClick={handleSubmit} px="45px" variant="contained" color="primary">Go</Button>
       </div>
-      <Status isStart={isStart} demuxRunning={demuxRunning} demuxComplete={demuxComplete} videoMetaData={videoMetaData}/>
+      <Status isStart={isStart} demuxRunning={demuxRunning} demuxComplete={demuxComplete} videoTitle={videoTitle}/>
     </div>
   )
+}
+
+
+function Status (props) {
+  const { isStart, demuxRunning, demuxComplete, videoTitle } = props
+
+  let elt = null
+  if (isStart) {
+    elt = <LinearProgress color="secondary" variant="indeterminate" />
+  } else if (demuxRunning) {
+    const msg = 'Running demuxr ' + (videoTitle ? 'on ' + videoTitle : '')
+    elt = <Typography color="secondary"> {msg} </Typography>
+  } else if (demuxComplete) {
+    elt = <Typography color="secondary">Ready to play!</Typography>
+  }
+  return (<div className="status">{elt}</div>)
 }
 
 function Player ({ folder, demuxRunning, demuxComplete }) {
@@ -148,6 +152,7 @@ function Player ({ folder, demuxRunning, demuxComplete }) {
   }
   const readyCountRef = useRef(0)
 
+  // run immediately after rendering for garbage cleanup
   useEffect(() => {
     return () => Object.values(stemRefs).map(ref => {
       if (ref.current) {
@@ -183,17 +188,22 @@ function Player ({ folder, demuxRunning, demuxComplete }) {
     return (
       <div className='player'>
 
-        <div id="stemoriginal">
+        {/* <div id="stemoriginal">
           <Stem folder={folder} id="original" label={demuxRunning ? 'Demuxing...' : 'Original Track'} onReady={handleReady} demuxComplete={demuxComplete} wavesurferRef={stemRefs.original} handleSeek={handleSeek} />
-        </div>
+        </div> */}
 
         {demuxComplete
-          ? <div className='stemgroup'>
-            <Stem folder={folder} id='bass' label="Bass" onReady={handleReady} demuxComplete={demuxComplete} wavesurferRef={stemRefs.bass} handleSeek={() => {}}/>
-            <Stem folder={folder} id='drums' label="Drums" onReady={handleReady} demuxComplete={demuxComplete} wavesurferRef={stemRefs.drums} handleSeek={() => {}}/>
-            <Stem folder={folder} id='other' label="Other" onReady={handleReady} demuxComplete={demuxComplete} wavesurferRef={stemRefs.other} handleSeek={() => {}}/>
-            <Stem folder={folder} id='vocals' label="Vocals" onReady={handleReady} demuxComplete={demuxComplete} wavesurferRef={stemRefs.vocals} handleSeek={() => {}}/>
+          ? <>
+            <div id="stemoriginal">
+              <Stem folder={folder} id="original" label={demuxRunning ? 'Demuxing...' : 'Original Track'} onReady={handleReady} demuxComplete={demuxComplete} wavesurferRef={stemRefs.original} handleSeek={handleSeek} />
+            </div>
+            <div className='stemgroup'>
+              <Stem folder={folder} id='bass' label="Bass" onReady={handleReady} demuxComplete={demuxComplete} wavesurferRef={stemRefs.bass} handleSeek={() => {}}/>
+              <Stem folder={folder} id='drums' label="Drums" onReady={handleReady} demuxComplete={demuxComplete} wavesurferRef={stemRefs.drums} handleSeek={() => {}}/>
+              <Stem folder={folder} id='other' label="Other" onReady={handleReady} demuxComplete={demuxComplete} wavesurferRef={stemRefs.other} handleSeek={() => {}}/>
+              <Stem folder={folder} id='vocals' label="Vocals" onReady={handleReady} demuxComplete={demuxComplete} wavesurferRef={stemRefs.vocals} handleSeek={() => {}}/>
           </div>
+          </>
           : null}
 
         <div className='play-btn'>
@@ -209,7 +219,7 @@ function Player ({ folder, demuxRunning, demuxComplete }) {
 
 function Stem (props) {
   const { folder, id, label, onReady, demuxComplete, wavesurferRef, handleSeek } = props
-  const url = folder + '/' + id + '.mp3'
+  const url = folder + '/' + id + '.ogg'
 
   return (
     <div className={'stem ' + id}>

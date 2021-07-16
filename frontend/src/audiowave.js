@@ -12,7 +12,7 @@ import React, {
   export default function AudioWave( {url, id, demuxComplete, onReady, wavesurferRef, handleSeek} ) {
     const buffer = 1600;
     const [timelineVis, setTimelineVis] = useState(true);
-    const [songLength, setSongLength] = useState(0);
+    // const [songLength, setSongLength] = useState(0);
   
     const wfOpts = {
       id: id + "-waveform",
@@ -41,18 +41,18 @@ import React, {
       ].filter(Boolean);
     }, [timelineVis]);
   
-    const [progress, setProgress] = useState(0);
+    // const [progress, setProgress] = useState(0);
   
     const handleWSMount = useCallback(
       waveSurfer => {
         wavesurferRef.current = waveSurfer;
         if (wavesurferRef.current) {
           wavesurferRef.current.load(url);
-          console.log("Loaded url for ", url, id);
+          
 
           wavesurferRef.current.on("ready", () => {
             console.log("WaveSurfer is ready for ", id);
-            setSongLength(wavesurferRef.current.getDuration());
+            // setSongLength(wavesurferRef.current.getDuration());
             onReady();
             wavesurferRef.current.setVolume(0.8);
           });
@@ -61,6 +61,10 @@ import React, {
             if (handleSeek !== undefined) {
                 handleSeek(data);
             }
+          });
+
+          wavesurferRef.current.on("loading", data => {
+            console.log(id, " loading --> ", data);
           });
   
           if (window) {
@@ -73,15 +77,16 @@ import React, {
   
   
     useEffect(() => {
-      const timer = songLength && setInterval(() => {
-        setProgress(progress + 1);
-        wavesurferRef.current.seekTo(progress/songLength);
-      }, buffer);
+      // const timer = songLength && setInterval(() => {
+      //   setProgress(progress + 1);
+      //   wavesurferRef.current.seekTo(progress/songLength);
+      // }, buffer);
       
-      if (progress > songLength || demuxComplete) {
-        clearInterval(timer);
+      // if (progress > songLength || demuxComplete) {
+      if (demuxComplete) {
+        // clearInterval(timer);
         let elt =  wavesurferRef.current;
-        elt.seekTo(0);
+        // elt.seekTo(0);
         elt.setWaveColor('#637bc1');
         elt.setProgressColor('#1c36c9');
         if (id !== "original") {
@@ -89,7 +94,7 @@ import React, {
           elt.toggleInteraction();
         }
       }
-      return () => clearInterval(timer);
+      // return () => clearInterval(timer);
     });
     
     return (

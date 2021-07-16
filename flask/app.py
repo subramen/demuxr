@@ -8,6 +8,7 @@ from loguru import logger
 import s3_helper as s3
 import io
 import json
+import time
 
 app = Flask(__name__)
 cors = CORS(app)
@@ -29,14 +30,17 @@ def get_yt_audio(url):
             'format': 'bestaudio/best',
             'postprocessors': [{
                 'key': 'FFmpegExtractAudio',
-                'preferredcodec': 'mp3',
+                'preferredcodec': 'vorbis',
                 'preferredquality': '128',}],
                 'postprocessor_args': ['-ar', '44100'],
         }
-    
+    tic = time.time()
     with youtube_dl.YoutubeDL(ydl_opts) as ydl:
         info_dict = ydl.extract_info(url, download=True)
-    audio_path = Path(temp) / info_dict['id'] / 'original.mp3'
+    audio_path = Path(temp) / info_dict['id'] / 'original.ogg'
+    toc = time.time()
+    logger.info("Audio downloaded from youtube in ", toc-tic, " s")
+    
     return audio_path, info_dict['id']
 
 
@@ -54,26 +58,16 @@ def get_yt_metadata(url):
         info_dict = ydl.extract_info(url, download=False)
         metadata['url'] = url
         metadata['title'] = info_dict.get('title', '')
-        metadata['folder'] = s3.get_url(info_dict.get('id', ''))
+        metadata['s3_folder'] = s3.get_url(info_dict.get('id', ''))
     return metadata
 
 
-def run_inference(inp_path):
+def run_inference(bucket, key):
     """ship audio to model"""
-    bucket, key = s3.upload_stem(inp_path) 
     resp = requests.post(url="http://model:8080/predictions/demucs_quantized/1", json={'Bucket': bucket, 'Key': key})
     if resp.status_code != 200:
         raise RuntimeError(f"Torchserve inference failed with HTTP {resp.status_code} | {resp.text}")
-    return resp.content
-
-
-def cache_stems(bytebuf, folder):
-    source_names = ["drums", "bass", "other", "vocals"]
-    n = len(bytebuf) // len(source_names)
-    stems = [bytebuf[i:i+n] for i in range(0, len(bytebuf), n)]
-    for name, stem in zip(source_names, stems):
-        s3.upload_stemobj(stem, folder, name)
-    return s3.get_url(folder)
+    return resp
 
 
 @app.route("/api/info")
@@ -85,13 +79,15 @@ def info():
 @app.route("/api/demux")
 @cross_origin()
 def demux():
+    is_cached = lambda folder: s3.grep(folder + '/vocals.ogg')
     url = request.args.get('url')
     audio_path, folder = get_yt_audio(url)
 
-    if not s3.grep(folder, 'vocals'):
-        bytebuf = run_inference(audio_path)
-        cache_stems(bytebuf, folder)
-    return {'msg': s3.get_url(folder), 'status':200}
+    if not is_cached(folder):
+        bucket, key = s3.upload_stem(audio_path) 
+        response = run_inference(bucket, key)
+
+    return {'response': s3.get_url(folder), 'status': 200}
 
 
 if __name__ == "__main__":
