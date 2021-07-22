@@ -19,7 +19,7 @@ const Button = styled(MuiButton)(spacing)
 function App () {
   const [sessId, setSessId] = useState(0)
   const [videoTitle, setVideoTitle] = useState("")
-  const [s3Folder, setS3Folder] = useState("")
+  const [s3Url, setS3Url] = useState("")
   
   // App states:
   const [isStart, setIsStart] = useState(false)
@@ -40,9 +40,9 @@ function App () {
     return fetch(INFO_API + url).then(response => response.json())
   })
 
-  const fetchInference = useCallback((url) => {
+  const fetchInference = useCallback((url, folder) => {
     console.log('running inference for url', url, '...')
-    return fetch(INFER_API + url, 1200000).then(response => response.json())
+    return fetch(INFER_API + url + "&folder=" + folder, 120000).then(response => response.json())
   })
 
   function runDemuxr (url) {
@@ -50,13 +50,15 @@ function App () {
 
     fetchVideoInfo(url)
       .then(data => {
+        console.log(data)
         setVideoTitle(data.title)
-        setS3Folder(data.s3_folder)
+        setS3Url(data.s3_url)
+        return data.video_id
       })
-      .then(() => {
+      .then((id) => {
         setIsStart(false)
         setDemuxRunning(true)
-        return fetchInference(url)
+        return fetchInference(url, id)
       })
       .then(data => {
         if (data.status === 200) {
@@ -84,7 +86,7 @@ function App () {
         demuxComplete={demuxComplete}
         resetStates={resetStates}/>
 
-        <Player key={sessId} folder={s3Folder} demuxRunning={demuxRunning} demuxComplete={demuxComplete} />
+        <Player key={sessId} folder={s3Url} demuxRunning={demuxRunning} demuxComplete={demuxComplete} />
 
         <footer className="footer">
           <Typography variant="h6">

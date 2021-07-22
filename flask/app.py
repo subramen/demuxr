@@ -39,9 +39,9 @@ def get_yt_audio(url):
         info_dict = ydl.extract_info(url, download=True)
     audio_path = Path(temp) / info_dict['id'] / 'original.ogg'
     toc = time.time()
-    logger.info("Audio downloaded from youtube in ", toc-tic, " s")
+    logger.info(f"Audio downloaded from youtube in {toc-tic}s")
     
-    return audio_path, info_dict['id']
+    return audio_path
 
 
 def get_yt_metadata(url):
@@ -58,12 +58,14 @@ def get_yt_metadata(url):
         info_dict = ydl.extract_info(url, download=False)
         metadata['url'] = url
         metadata['title'] = info_dict.get('title', '')
-        metadata['s3_folder'] = s3.get_url(info_dict.get('id', ''))
+        metadata['video_id'] = info_dict.get('id')
+        metadata['s3_url'] = s3.get_url(info_dict.get('id'))
     return metadata
 
 
-def run_inference(bucket, key):
+def run_inference(key):
     """ship audio to model"""
+    bucket = "demucs-app-cache"
     resp = requests.post(url="http://model:8080/predictions/demucs_quantized/1", json={'Bucket': bucket, 'Key': key})
     if resp.status_code != 200:
         raise RuntimeError(f"Torchserve inference failed with HTTP {resp.status_code} | {resp.text}")
@@ -79,15 +81,24 @@ def info():
 @app.route("/api/demux")
 @cross_origin()
 def demux():
-    is_cached = lambda folder: s3.grep(folder + '/vocals.ogg')
     url = request.args.get('url')
-    audio_path, folder = get_yt_audio(url)
+    folder = request.args.get('folder')
+    logger.info(f"Received request of url {url} and folder {folder}")
 
-    if not is_cached(folder):
-        bucket, key = s3.upload_stem(audio_path) 
-        response = run_inference(bucket, key)
-
-    return {'response': s3.get_url(folder), 'status': 200}
+    is_cached = lambda folder: s3.grep(folder + '/original.ogg')
+    is_inferred = lambda folder: s3.grep(folder + '/vocals.ogg')
+    status = 404
+    
+    if is_inferred(folder):
+        status = 200
+    else:
+        key = folder + '/original.ogg'
+        if not is_cached(folder): 
+            s3.upload_stem(get_yt_audio(url)) 
+        response = run_inference(key)
+        status = response.status_code
+        
+    return {'response': s3.get_url(folder), 'status': status}
 
 
 if __name__ == "__main__":
