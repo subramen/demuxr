@@ -85,21 +85,22 @@ class DemucsHandler(BaseHandler):
         for source in inference_output:
             source = source / max(1.01 * source.abs().max(), 1)  # source.max(dim=1).values.max(dim=-1)
             source = (source * 2**15).clamp_(-2**15, 2**15 - 1).short()
-            source = source.cpu()
+            source = source.cpu().numpy()
             stems.append(source)
         return stems
 
 
-    def cache(self, stems, s3_folder):
+    def cache(self, stems, s3_folder, fmt=None):
         bucket, folder = s3_folder
+        key = folder + '/inferred.npz'
         source_names = ["drums", "bass", "other", "vocals"]
-        for name, stem in zip(source_names, stems):
-            fmt = 'ogg'
-            key = folder + '/' + name + '.' + fmt
-            with io.BytesIO() as buf_:
-                ta.save(buf_, stem, 44100, format=fmt)
-                buf_.seek(0)
-                self.s3_client.upload_fileobj(buf_, bucket, key, ExtraArgs={'ACL':'public-read'})
+        stems = dict(zip(source_names, stems))
+        with io.BytesIO() as buf_:
+            np.savez_compressed(buf_, **stems)
+            buf_.seek(0)
+            self.s3_client.upload_fileobj(buf_, bucket, key, ExtraArgs={'ACL':'public-read'})
+        return key
+
 
 
     def handle(self, data, context):
@@ -118,10 +119,10 @@ class DemucsHandler(BaseHandler):
         logger.info(f'postprocess took {time.time()-tic}')
     
         tic = time.time()
-        self.cache(stems, s3_folder)
+        key = self.cache(stems, s3_folder)
         logger.info(f'caching took {time.time()-tic}')
 
-        result = {"Bucket": s3_folder[0], "Folder": s3_folder[1]}
+        result = {"bucket": s3_folder[0], "folder": s3_folder[1], "object": key}
 
         return [result]
 

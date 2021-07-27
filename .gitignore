@@ -13,3 +13,5 @@ node_modules*
 .eslint*
 script_compile.py
 *.pyc
+stress.py
+test*.py
