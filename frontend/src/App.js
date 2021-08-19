@@ -189,11 +189,6 @@ function Player ({ folder, demuxRunning, demuxComplete }) {
   } else {
     return (
       <div className='player'>
-
-        {/* <div id="stemoriginal">
-          <Stem folder={folder} id="original" label={demuxRunning ? 'Demuxing...' : 'Original Track'} onReady={handleReady} demuxComplete={demuxComplete} wavesurferRef={stemRefs.original} handleSeek={handleSeek} />
-        </div> */}
-
         {demuxComplete
           ? <>
             <div id="stemoriginal">
