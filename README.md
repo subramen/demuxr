@@ -5,7 +5,7 @@ Demuxr (http://demuxr.com) is a machine learning app that splits an audio track 
 
 
 ## Who is Demuxr for?
-Demuxr is for anyone who wishes they had a karaoke version of their favorite tracks, not limited to voice karaoke! I use Demuxr to train my bass ear, isolate tricky riffs, and karaoke-jam on my bass and guitar. My friend replaces vocals with his own. His friend listens to isolated drum tracks on loop because he's a bit crazy like that. Demuxr is for anyone who wants to play around with the music they listen to.
+Demuxr is for anyone who wishes they had a karaoke version of their favorite tracks, not limited to voice karaoke! I use Demuxr to train my bass ear, isolate tricky riffs, and karaoke-jam on my bass and guitar. My friend replaces vocals with his own. His friend listens to isolated drum tracks on loop. Demuxr is for anyone who wants to play around with the music they listen to.
 
 ## How do I use it?
 1. Find your song on youtube
@@ -29,6 +29,6 @@ There's definitely room to improve, and any contribution will make a difference.
 The model takes - under ideal conditions - a minute or so to split a 6-minute song. If there's a lot of people running Demuxr at the same time, you're in a queue and that can take a while (depends on how long the queue is). That is not the experience I'd like you to have though, so open an issue while you're waiting (thx).
 
 ## The audio split sux, I muted the vocals out but I can still hear them wth?
-The model is trained on the [MusDB dataset](https://sigsep.github.io/datasets/musdb.html) that consists of 150 tracks along with their isolated bass, drums, vocals and accompaniment stems. Most of the songs in this dataset are from the Pop/Rock genre; under/un-represented genres will be more challenging to the model to demux, and it will resort to what it interpretss as various instruments. For example, you might clearly hear the sax and other wind instruments in the demuxed Vocal stem.
+The model is trained on the [MusDB dataset](https://sigsep.github.io/datasets/musdb.html) that consists of 150 tracks along with their isolated bass, drums, vocals and accompaniment stems. Most of the songs in this dataset are from the Pop/Rock genre. Under/Un-represented genres will be more challenging for the model to demux, and it will resort to what it interprets as various instruments. For example, you might clearly hear the sax and other wind instruments in the demuxed Vocal stem.
 
 ![Genres in MusDB](https://i.imgur.com/Zv4R928.png)
