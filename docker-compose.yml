@@ -2,10 +2,6 @@ version: "3"
 services:
   model:
     build: ./model
-    ports:
-      - "8080:8080"
-      - "8081:8081"
-      - "8082:8082"
     container_name: model
     deploy:
       resources:
@@ -17,8 +13,6 @@ services:
 
   flask:
     build: ./flask
-    ports:
-      - "5000:5000"
     depends_on:
       - model
     container_name: flask
