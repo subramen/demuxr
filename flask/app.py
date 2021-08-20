@@ -8,120 +8,119 @@ from loguru import logger
 import s3_helper as s3
 import io
 import json
+import time
+import boto3
+from botocore.config import Config
 
 app = Flask(__name__)
 cors = CORS(app)
 torchserve_url = "http://model:8080/"
-pred_endpoint = "predictions/demucs/1"
-MAX_AUDIO_DURATION = 6500
+pred_endpoint = "predictions/demucs_quantized/1"
+BUCKET = "demucs-app-cache"
+
+lambda_client = boto3.client('lambda', region_name='us-east-1', config=Config(read_timeout=180))
+
+
+def get_yt_audio(url):
+    """
+    downloads the url
+    returns path of the audio
+    TODO: return fileobj instead and delete tmp file
+    """
+    with tempfile.TemporaryDirectory() as temp:
+        ydl_opts = {
+            'quiet':True,
+            'outtmpl':f'{temp}/%(id)s/original.%(ext)s',
+            'format': 'bestaudio/best',
+            'postprocessors': [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'vorbis',
+                'preferredquality': '128',}],
+                'postprocessor_args': ['-ar', '44100'],
+        }
+    with youtube_dl.YoutubeDL(ydl_opts) as ydl:
+        info_dict = ydl.extract_info(url, download=True)
+    audio_path = Path(temp) / info_dict['id'] / 'original.ogg'
+    return audio_path
+
+# movable to frontend/js
+def get_yt_metadata(url):
+    """
+        response = {
+        'url': url,
+        'title': info_dict['title'],
+        'id': info_dict['id'],
+        # 'folder': s3.get_url(info_dict['id']),
+        # 'status': 200
+    }"""
+    metadata = {}
+    with youtube_dl.YoutubeDL({}) as ydl:
+        info_dict = ydl.extract_info(url, download=False)
+        metadata['url'] = url
+        metadata['title'] = info_dict.get('title', '')
+        metadata['video_id'] = info_dict.get('id')
+        metadata['s3_url'] = s3.get_url(info_dict.get('id'))
+    return metadata
+
+# movable to frontend/js
+def run_inference(key):
+    """ship audio to model"""
+    resp = requests.post(url="http://model:8080/predictions/demucs_quantized/1", json={'Bucket': BUCKET, 'Key': key})
+    if resp.status_code != 200:
+        raise RuntimeError(f"Torchserve inference failed with HTTP {resp.status_code} | {resp.text}")
+
+
+def run_encode(inferred_loc):
+    """
+    aws --debug --cli-read-timeout 0  lambda invoke --function-name test --payload '{"bucket": "demucs-app-cache", "object": "test/inferred.npz"}' out.json
+    """
+    logger.info("Invoking encode function on Lambda")
+    ret  = lambda_client.invoke(FunctionName='test', InvocationType='RequestResponse', Payload=json.dumps(inferred_loc))
+    return ret
 
 
 @app.route("/api/info")
 @cross_origin()
 def info():
     url = request.args.get('url')
-    logger.info(f'Pinging /api/info with param = {url}')
-    return get_video_info(url)
+    return get_yt_metadata(url)
 
 @app.route("/api/demux")
 @cross_origin()
 def demux():
-    response = {'msg': '', 'status': 0}
     url = request.args.get('url')
-    logger.info(f'Pinging /api/demux with param = {url}')
+    folder = request.args.get('folder')
+    logger.info(f"Received request of url {url} and folder {folder}")
 
-    folder = youtubedl(url, download=False)['id']
-
-    # Check if demuxed stems in cache
-    if not s3.grep(folder, 'vocals'):
-        stem_bytes = run_demuxr(folder)
-        for stem, bytes in stem_bytes.items():
-            s3.upload_stem(bytes, folder, stem)
-
-    response['status'] = 200
-    response['msg'] = s3.get_url(folder)
-    logger.info(f"Response = {response}")
-    return response
-
-  
-# get ETA + other things
-def get_video_info(url):
-    info_dict = youtubedl(url)
-    response = {
-        'url': url,
-        'title': info_dict['title'],
-        'id': info_dict['id'],
-        'folder': s3.get_url(info_dict['id']),
-        'status': 200
-    }
-    logger.info(response)
-    return response
-
-
-# get the youtube info_dict
-def youtubedl(url, download=True):
-    temp = tempfile.TemporaryDirectory() # TODO: Use as context manager 
-    ydl_opts = {
-        'quiet':True,
-        'outtmpl':f'{temp.name}/%(id)s/original.%(ext)s',
-        'format': 'bestaudio/best',
-        'postprocessors': [{
-            'key': 'FFmpegExtractAudio',
-            'preferredcodec': 'mp3',
-            'preferredquality': '192',}]
-        }
-
-    with youtube_dl.YoutubeDL(ydl_opts) as ydl:
-        # get video info like id, title
-        info_dict = ydl.extract_info(url, download=download)
-
-        if download:
-            # store the audio bytes in return dict
-            out_file = Path(temp.name) / info_dict['id'] / 'original.mp3'
-            info_dict['mp3_bytes'] = open(out_file, 'rb').read()
-            # upload original.mp3 to S3 if it doesn't exist
-            s3.upload_stem(info_dict['mp3_bytes'], info_dict['id'], 'original', force=False)
+    is_input_cached = lambda folder: s3.grep(folder + '/original.ogg')
+    is_inferred = lambda folder: s3.grep(folder + '/inferred.npz')
+    is_encoded = lambda folder: s3.grep(folder + '/vocals.ogg')
+    get_inferred_loc = lambda folder: {"bucket": BUCKET, "object": f"{folder}/inferred.npz"}
     
-    return info_dict
+    if is_encoded(folder):
+       return {'urls': s3.get_presigned_urls(folder), 'status': 200}
 
-
-# check if torchserve is up
-def torchserve_healthy():
-    logger.info("Checking torchserve health... ")
-    status = json.loads(requests.get(torchserve_url+'ping').text)['status']
-    if status != "Healthy":
-        logger.error(f"Torchserve status: {status}")
-        return False
-    logger.debug("Torchserve is healthy")
-    return True
-
-
-# get the stems in bytes
-def run_demuxr(folder):
-    pred_url = torchserve_url + pred_endpoint
-
-    # check if server ping is healthy
-    if not torchserve_healthy():
-        raise RuntimeError("Model server not healthy!")
+    if is_inferred(folder):
+        inferred_loc = get_inferred_loc(folder)
+        encoded = run_encode(inferred_loc)
     
-    mp3_bytes = io.BytesIO()
-    s3.download_stem(folder, 'original', mp3_bytes)
-    try:
-        response = requests.post(url=pred_url, data=mp3_bytes.getvalue(), headers={'Content-Type': 'audio/mpeg'})
-    except:
-        logger.error(f"Inference request failed with {response.status_code} | {response.text}")
-        raise RuntimeError("Torchserve inference failed!")
-
-    logger.debug("Inference done!")
-    bytebuf = response.content
-    n = len(bytebuf)//4
-    stems = [bytebuf[i:i+n] for i in range(0, len(bytebuf), n)]
-    source_names = ["drums", "bass", "other", "vocals"]
-    stem_bytes = dict(zip(source_names, stems))
-    stem_bytes['original'] = mp3_bytes
+    elif is_input_cached(folder):
+        key = f'{folder}/original.ogg'
+        run_inference(key)
+        inferred_loc = get_inferred_loc(folder)
+        encoded = run_encode(inferred_loc)
     
-    return stem_bytes
-        
+    else:
+        audio_path = get_yt_audio(url)
+        s3.upload_stem(audio_path) 
+        key = f'{folder}/original.ogg'
+        run_inference(key)
+        inferred_loc = get_inferred_loc(folder)
+        encoded = run_encode(inferred_loc)
+    
+    resp = {'urls': s3.get_presigned_urls(folder), 'status': encoded['StatusCode']}
+    logger.info(resp)
+    return resp
 
 
 if __name__ == "__main__":

@@ -6,51 +6,34 @@ import io
 BUCKET = 'demucs-app-cache'
 S3_CLIENT = boto3.client('s3')
 
-# ls
-def ls():
-    """
-    return cached demuxed IDs
-    """
-    contents = [d['Prefix'].split('/vocals.mp3')[0] for d in S3_CLIENT.list_objects_v2(Bucket=BUCKET, Delimiter='/vocals.mp3')['CommonPrefixes']]
-    return contents
 
-
-def grep(folder, stem=None):
-    """
-    returns true if folder (or folder/stem.mp3) exists
-    """
-    if stem == None:
-        return folder in ls()
-    if stem[-4:] != '.mp3': 
-        stem += '.mp3'
+def grep(obj):
     try:
-        S3_CLIENT.head_object(Bucket=BUCKET, Key=f"{folder}/{stem}")
+        S3_CLIENT.head_object(Bucket=BUCKET, Key=obj)
     except ClientError:
-        logger.info(f"{folder}/{stem} not found in cache")
+        logger.info(f"{obj} not found in cache")
         return False
-    logger.info(f"{folder}/{stem} found in cache")
+    logger.info(f"{obj} found in cache")
     return True
 
-# upload to s3
-def upload_stem(mp3_bytes, folder, stem, force=False):
-    if grep(folder, stem) and not force:
+
+def upload_stem(path, force=False):
+    logger.info(f"Received request to upload {path}")
+    folder, stem = path.parts[-2:]
+    key = f"{folder}/{stem}"
+    if grep(key) and not force:
         logger.info("File exists! Not overwriting")    
-        return 
-
-    object_name = f"{folder}/{stem}.mp3"
-    logger.info(f'Uploading {object_name}')
-    S3_CLIENT.upload_fileobj(io.BytesIO(mp3_bytes), BUCKET, object_name, ExtraArgs={'ACL':'public-read'})
-
-def download_stem(folder, stem, fileobj):
-    object_name = f"{folder}/{stem}.mp3"
-
-    if not grep(folder, stem):
-        logger.info(f"File {object_name} not found in S3!")    
-        return 
-
-    logger.info(f'Downloading {object_name}')
-    S3_CLIENT.download_fileobj(BUCKET, object_name, fileobj)
+    else:
+        logger.info(f'Uploading {key}')
+        S3_CLIENT.upload_file(str(path), BUCKET, key, ExtraArgs={'ACL':'public-read'})
     
+    return (BUCKET, key)
 
-def get_url(folder):
-    return f'http://{BUCKET}.s3.amazonaws.com/{folder}'
+def get_presigned_urls(folder):
+    out_dict = {}
+    for obj in ['bass', 'drums', 'vocals', 'other', 'original']:
+        out_dict[obj] = boto3.client('s3').generate_presigned_url(ClientMethod='get_object', Params={'Bucket':BUCKET, 'Key':f'{folder}/{obj}.ogg'}, ExpiresIn=180)
+    return out_dict
+
+def get_url(folder, presigned=True):
+    return f'http://{BUCKET}.s3.amazonaws.com/{folder}' 
