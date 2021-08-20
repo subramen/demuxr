@@ -31,4 +31,4 @@ The model takes - under ideal conditions - a minute or so to split a 6-minute so
 ## The audio split sux, I muted the vocals out but I can still hear them wth?
 The model is trained on the [MusDB dataset](https://sigsep.github.io/datasets/musdb.html) that consists of 150 tracks along with their isolated bass, drums, vocals and accompaniment stems. Most of the songs in this dataset are from the Pop/Rock genre; under/un-represented genres will be more challenging to the model to demux, and it will resort to what it interpretss as various instruments. For example, you might clearly hear the sax and other wind instruments in the demuxed Vocal stem.
 
-![Genres in MusDB](https://imgur.com/Zv4R928)
+![Genres in MusDB](https://i.imgur.com/Zv4R928.png)
