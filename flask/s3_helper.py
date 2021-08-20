@@ -18,6 +18,7 @@ def grep(obj):
 
 
 def upload_stem(path, force=False):
+    logger.info(f"Received request to upload {path}")
     folder, stem = path.parts[-2:]
     key = f"{folder}/{stem}"
     if grep(key) and not force:

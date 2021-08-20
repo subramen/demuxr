@@ -27,21 +27,21 @@ function App () {
   const [demuxComplete, setDemuxComplete] = useState(false)
 
   const resetStates = useCallback(() => {
-    console.log('resetting from ', isStart, demuxRunning, demuxComplete)
+    // console.log('resetting from ', isStart, demuxRunning, demuxComplete)
     setIsStart(false)
     setDemuxRunning(false)
     setDemuxComplete(false)
     setSessId(Date.now())
-    console.log(sessId)
+    // console.log(sessId)
   })
 
   const fetchVideoInfo = useCallback((url) => {
-    console.log('fetching info for url ', url, '...')
+    // console.log('fetching info for url ', url, '...')
     return fetch(INFO_API + url).then(response => response.json())
   })
 
   const fetchInference = useCallback((url, folder) => {
-    console.log('running inference for url', url, '...')
+    // console.log('running inference for url', url, '...')
     return fetch(INFER_API + url + "&folder=" + folder, 120000).then(response => response.json())
   })
 
@@ -50,7 +50,7 @@ function App () {
 
     fetchVideoInfo(url)
       .then(data => {
-        console.log(data)
+        // console.log(data)
         setVideoTitle(data.title)
         setS3Url(data.s3_url)
         return data.video_id
@@ -141,7 +141,7 @@ function Status (props) {
 }
 
 function Player ({ folder, demuxRunning, demuxComplete }) {
-  console.log('<player> ', folder, demuxRunning, demuxComplete)
+  // console.log('<player> ', folder, demuxRunning, demuxComplete)
 
   const [playEnabled, setPlayEnabled] = useState(false)
   const stems = ['original', 'bass', 'drums', 'other', 'vocals']
@@ -158,7 +158,7 @@ function Player ({ folder, demuxRunning, demuxComplete }) {
   useEffect(() => {
     return () => Object.values(stemRefs).map(ref => {
       if (ref.current) {
-        console.log('destroying')
+        // console.log('destroying')
         ref.current.stop()
         ref.current.destroy()
         setPlayEnabled(false)
@@ -168,7 +168,7 @@ function Player ({ folder, demuxRunning, demuxComplete }) {
 
   const handleReady = () => {
     readyCountRef.current += 1
-    console.log('ready ', readyCountRef.current, stems.length)
+    // console.log('ready ', readyCountRef.current, stems.length)
     if (readyCountRef.current >= stems.length) setPlayEnabled(true)
   }
 
