@@ -23,7 +23,7 @@ Enter AI. [Demucs](https://github.com/facebookresearch/demucs) is a model from F
 Before deploying it on to Demuxr, I made a few changes that result in the model running faster; this optimization is a work-in-progress. Hit me up if you'd like to know more.
 
 ## Contributing
-There's definitely room to improve, and any contribution will make a difference. Maybe we should optimize the ML model, enhance the UX by making this a chrome plugin,  or \<your awesome idea here\>... please open an issue if you'd like to work on something. Please also open an issue if you encounter a bug. Thank you for even considering it!
+There's definitely room to improve, and any contribution - issues, bugs, or code - are welcome! Please reach out or open an issue.
 
 ## This takes too long to run, what gives?
 The model takes - under ideal conditions - a minute or so to split a 6-minute song. If there's a lot of people running Demuxr at the same time, you're in a queue and that can take a while (depends on how long the queue is). That is not the experience I'd like you to have though, so open an issue while you're waiting (thx).
