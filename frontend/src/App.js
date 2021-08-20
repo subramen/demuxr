@@ -52,22 +52,24 @@ function App () {
       .then(data => {
         // console.log(data)
         setVideoTitle(data.title)
-        setS3Url(data.s3_url)
+        // setS3Url(data.s3_url)
         return data.video_id
       })
       .then((id) => {
         setIsStart(false)
         setDemuxRunning(true)
+        console.log(id)
         return fetchInference(url, id)
       })
-      .then(data => {
-        if (data.status === 200) {
+      .then(response => {
+        console.log(response)
+        if (response.status === 200) {
+          setS3Url(response.urls)
           setDemuxRunning(false)
           setDemuxComplete(true)
         } else {
-          throw new Error('Inference failed, HTTP:', data.status)
+          throw new Error('Inference failed, HTTP:', response.status)
         }
-        return data.status
       })
       .catch(error => {
         console.error(error)
@@ -86,7 +88,7 @@ function App () {
         demuxComplete={demuxComplete}
         resetStates={resetStates}/>
 
-        <Player key={sessId} folder={s3Url} demuxRunning={demuxRunning} demuxComplete={demuxComplete} />
+        <Player key={sessId} urls={s3Url} demuxRunning={demuxRunning} demuxComplete={demuxComplete} />
 
         <footer className="footer">
           <Typography variant="h6">
@@ -140,8 +142,8 @@ function Status (props) {
   return (<div className="status">{elt}</div>)
 }
 
-function Player ({ folder, demuxRunning, demuxComplete }) {
-  // console.log('<player> ', folder, demuxRunning, demuxComplete)
+function Player ({ urls, demuxRunning, demuxComplete }) {
+  // console.log('<player> ', urls, demuxRunning, demuxComplete)
 
   const [playEnabled, setPlayEnabled] = useState(false)
   const stems = ['original', 'bass', 'drums', 'other', 'vocals']
@@ -192,13 +194,13 @@ function Player ({ folder, demuxRunning, demuxComplete }) {
         {demuxComplete
           ? <>
             <div id="stemoriginal">
-              <Stem folder={folder} id="original" label={demuxRunning ? 'Demuxing...' : 'Original Track'} onReady={handleReady} demuxComplete={demuxComplete} wavesurferRef={stemRefs.original} handleSeek={handleSeek} />
+              <Stem urls={urls} id="original" label={demuxRunning ? 'Demuxing...' : 'Original Track'} onReady={handleReady} demuxComplete={demuxComplete} wavesurferRef={stemRefs.original} handleSeek={handleSeek} />
             </div>
             <div className='stemgroup'>
-              <Stem folder={folder} id='bass' label="Bass" onReady={handleReady} demuxComplete={demuxComplete} wavesurferRef={stemRefs.bass} handleSeek={() => {}}/>
-              <Stem folder={folder} id='drums' label="Drums" onReady={handleReady} demuxComplete={demuxComplete} wavesurferRef={stemRefs.drums} handleSeek={() => {}}/>
-              <Stem folder={folder} id='other' label="Other" onReady={handleReady} demuxComplete={demuxComplete} wavesurferRef={stemRefs.other} handleSeek={() => {}}/>
-              <Stem folder={folder} id='vocals' label="Vocals" onReady={handleReady} demuxComplete={demuxComplete} wavesurferRef={stemRefs.vocals} handleSeek={() => {}}/>
+              <Stem urls={urls} id='bass' onReady={handleReady} demuxComplete={demuxComplete} wavesurferRef={stemRefs.bass} handleSeek={() => {}}/>
+              <Stem urls={urls} id='drums' onReady={handleReady} demuxComplete={demuxComplete} wavesurferRef={stemRefs.drums} handleSeek={() => {}}/>
+              <Stem urls={urls} id='other' onReady={handleReady} demuxComplete={demuxComplete} wavesurferRef={stemRefs.other} handleSeek={() => {}}/>
+              <Stem urls={urls} id='vocals' onReady={handleReady} demuxComplete={demuxComplete} wavesurferRef={stemRefs.vocals} handleSeek={() => {}}/>
           </div>
           </>
           : null}
@@ -215,8 +217,10 @@ function Player ({ folder, demuxRunning, demuxComplete }) {
 }
 
 function Stem (props) {
-  const { folder, id, label, onReady, demuxComplete, wavesurferRef, handleSeek } = props
-  const url = folder + '/' + id + '.ogg'
+  const { urls, id, onReady, demuxComplete, wavesurferRef, handleSeek } = props
+  const url = urls[id]
+  console.log(url)
+  const label = id.charAt(0).toUpperCase() + id.slice(1)
 
   return (
     <div className={'stem ' + id}>

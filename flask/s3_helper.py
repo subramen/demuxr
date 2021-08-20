@@ -29,6 +29,11 @@ def upload_stem(path, force=False):
     
     return (BUCKET, key)
 
+def get_presigned_urls(folder):
+    out_dict = {}
+    for obj in ['bass', 'drums', 'vocals', 'other', 'original']:
+        out_dict[obj] = boto3.client('s3').generate_presigned_url(ClientMethod='get_object', Params={'Bucket':BUCKET, 'Key':f'{folder}/{obj}.ogg'}, ExpiresIn=180)
+    return out_dict
 
-def get_url(folder):
-    return f'http://{BUCKET}.s3.amazonaws.com/{folder}'
+def get_url(folder, presigned=True):
+    return f'http://{BUCKET}.s3.amazonaws.com/{folder}' 

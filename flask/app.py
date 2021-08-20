@@ -95,18 +95,19 @@ def demux():
     is_input_cached = lambda folder: s3.grep(folder + '/original.ogg')
     is_inferred = lambda folder: s3.grep(folder + '/inferred.npz')
     is_encoded = lambda folder: s3.grep(folder + '/vocals.ogg')
+    get_inferred_loc = lambda folder: {"bucket": BUCKET, "object": f"{folder}/inferred.npz"}
     
     if is_encoded(folder):
-       return {'response': s3.get_url(folder), 'status': 200}
+       return {'urls': s3.get_presigned_urls(folder), 'status': 200}
 
     if is_inferred(folder):
-        inferred_loc = {"bucket": BUCKET, "object": f"{folder}/inferred.npz"}
+        inferred_loc = get_inferred_loc(folder)
         encoded = run_encode(inferred_loc)
     
     elif is_input_cached(folder):
         key = f'{folder}/original.ogg'
         run_inference(key)
-        inferred_loc = {"bucket": BUCKET, "object": f"{folder}/inferred.npz"}
+        inferred_loc = get_inferred_loc(folder)
         encoded = run_encode(inferred_loc)
     
     else:
@@ -114,10 +115,10 @@ def demux():
         s3.upload_stem(audio_path) 
         key = f'{folder}/original.ogg'
         run_inference(key)
-        inferred_loc = {"bucket": BUCKET, "object": f"{folder}/inferred.npz"}
+        inferred_loc = get_inferred_loc(folder)
         encoded = run_encode(inferred_loc)
     
-    resp = {'response': s3.get_url(folder), 'status': encoded['StatusCode']}
+    resp = {'urls': s3.get_presigned_urls(folder), 'status': encoded['StatusCode']}
     logger.info(resp)
     return resp
 
