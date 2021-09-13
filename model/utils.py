@@ -108,10 +108,11 @@ def apply_model(model, mix, max_batch_sz=None, overlap=0.25, transition_power=1.
 
     def infer(inp, length):
         with torch.no_grad():
-            x = model(inp)
-            x.detach()
-            if length:
-                x = center_trim(x, length)
+            with torch.cuda.amp.autocast():
+                x = model(inp)
+                x.detach()
+                if length:
+                    x = center_trim(x, length)
         return x
 
 
