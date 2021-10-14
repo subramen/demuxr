@@ -25,7 +25,7 @@ def upload_stem(path, force=False):
         logger.info("File exists! Not overwriting")    
     else:
         logger.info(f'Uploading {key}')
-        S3_CLIENT.upload_file(str(path), BUCKET, key, ExtraArgs={'ACL':'public-read'})
+        S3_CLIENT.upload_file(str(path), BUCKET, key)
     
     return (BUCKET, key)
 

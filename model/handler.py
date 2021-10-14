@@ -1,5 +1,5 @@
 import torch
-import torchaudio as ta
+import torchaudio
 from ts.torch_handler.base_handler import BaseHandler
 from pathlib import Path
 import uuid
@@ -9,28 +9,34 @@ import io
 import json
 import boto3
 import time
+import numpy as np
 
 # From https://github.com/facebookresearch/demucs/
 from model import Demucs
 from utils import load_model, apply_model
 
-def hacky_read_ogg(s3, inp):
-    """torchaudio has a bug where it cannot read an ogg file-like object, so we write it to disk and delete after reading"""
-    import uuid, os
-    tmp = str(uuid.uuid1())
-    s3.download_file(inp['Bucket'], inp['Key'], tmp)
-    wav, _ = ta.load(tmp, format='ogg')
-    assert wav.size(-1) > 0
-    os.remove(tmp)
-    return wav
+S3_CLIENT = boto3.client('s3')
+DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+torchaudio.utils.sox_utils.set_buffer_size(8192 * 2)
+
+
+def read_ogg_from_s3(bucket, key):
+    response = S3_CLIENT.get_object(Bucket=bucket, Key=key)
+    waveform, sample_rate = torchaudio.load(response['Body'], format='ogg')
+    return waveform
+
+ 
+def read_model(model_weights_path):
+    model = load_model(Demucs([1,1,1,1]), model_weights_path, True)
+    return model
+
+
 
 class DemucsHandler(BaseHandler):
     def __init__(self):
         self.model = None
         self.filedir = Path("filedir")
         self.filedir.mkdir(exist_ok=True)
-        self.s3_client = boto3.client('s3')
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
     def initialize(self, ctx):
@@ -42,33 +48,26 @@ class DemucsHandler(BaseHandler):
         self.manifest = ctx.manifest
         properties = ctx.system_properties
         model_weights_path = Path(properties.get("model_dir")) / Path(self.manifest['model']['serializedFile'])
-        model = Demucs([1,1,1,1]).to(self.device)
-        self.model = load_model(model, model_weights_path, True)
+        self.model = read_model(model_weights_path).to(DEVICE)
+
+
+    def read_input(self, data):
+        inp = data[0].get('data') or data[0].get('body') 
+        s3_folder = (inp['Bucket'], inp['Key'].split('/')[0])
+        wav = read_ogg_from_s3(inp['Bucket'], inp['Key'])
+        wav = wav.to(DEVICE)
+        return wav, s3_folder
         
 
-    def preprocess(self, inp):
+    def preprocess(self, wav):
         """
-        Transform raw input into model input data.
         track: audio file
         :return: tensor of normalized audio
         """
-        s3_folder = None
-        if isinstance(inp, (bytes, bytearray)):  # deprecated
-            audio_obj = io.BytesIO(inp)
-        elif isinstance(inp, dict):
-            logger.info(f"Downloading input audio from {inp}")
-            # audio_obj = self.s3_client.get_object(Bucket=inp['Bucket'], Key=inp['Key'])['Body']
-            wav = hacky_read_ogg(self.s3_client, inp)
-            s3_folder = (inp['Bucket'], inp['Key'].split('/')[0])
-        else:
-            raise RuntimeError(f"Expected input of type bytes or dict, received {type(inp)}")
-        
-        # wav, _ = ta.load(audio_obj, format='ogg')
-        wav = wav.to(self.device)
         ref = wav.mean(0)
         wav = (wav - ref.mean()) / ref.std()
         logger.info(f"Processed audio into tensor of size {wav.size()}")
-        return wav, ref, s3_folder
+        return wav, ref
 
 
     def inference(self, wav, ref):
@@ -98,16 +97,16 @@ class DemucsHandler(BaseHandler):
         with io.BytesIO() as buf_:
             np.savez_compressed(buf_, **stems)
             buf_.seek(0)
-            self.s3_client.upload_fileobj(buf_, bucket, key, ExtraArgs={'ACL':'public-read'})
+            S3_CLIENT.upload_fileobj(buf_, bucket, key)
         return key
 
 
 
     def handle(self, data, context):
-        inp = data[0].get('data') or data[0].get('body') 
-        
+        wav, s3_folder = self.read_input(data)
+
         tic = time.time()
-        wav, ref, s3_folder = self.preprocess(inp)
+        wav, ref = self.preprocess(wav)
         logger.info(f'preprocess took  {time.time()-tic}')
         
         tic = time.time()
