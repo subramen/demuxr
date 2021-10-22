@@ -4,9 +4,7 @@ from ts.torch_handler.base_handler import BaseHandler
 from pathlib import Path
 import uuid
 from loguru import logger
-from diffq import DiffQuantizer
 import io
-import json
 import boto3
 import time
 import numpy as np
@@ -17,7 +15,7 @@ from utils import load_model, apply_model
 
 S3_CLIENT = boto3.client('s3')
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-torchaudio.utils.sox_utils.set_buffer_size(8192 * 2)
+torchaudio.utils.sox_utils.set_buffer_size(8192 * 20)
 
 
 def read_ogg_from_s3(bucket, key):
@@ -79,7 +77,7 @@ class DemucsHandler(BaseHandler):
 
 
     # From https://github.com/facebookresearch/demucs/blob/dd7a77a0b2600d24168bbe7a40ef67f195586b62/demucs/separate.py#L207
-    def postprocess(self, inference_output) -> Path:
+    def postprocess(self, inference_output):
         stems = []
         for source in inference_output:
             source = source / max(1.01 * source.abs().max(), 1)  # source.max(dim=1).values.max(dim=-1)

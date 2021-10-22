@@ -122,7 +122,6 @@ def apply_model(model, mix, max_batch_sz=None, overlap=0.25, transition_power=1.
         chunked_output = torch.vstack([infer(inp, out_length) for inp in batched_input])
         return chunked_output
 
-
     seg_list = []
     stride = int((1 - overlap) * SEG_LEN) 
     offsets = range(0, total_length, stride)

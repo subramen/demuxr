@@ -75,7 +75,7 @@ def run_encode(inferred_loc):
     aws --debug --cli-read-timeout 0  lambda invoke --function-name test --payload '{"bucket": "demucs-app-cache", "object": "test/inferred.npz"}' out.json
     """
     logger.info("Invoking encode function on Lambda")
-    ret  = lambda_client.invoke(FunctionName='test', InvocationType='RequestResponse', Payload=json.dumps(inferred_loc))
+    ret  = lambda_client.invoke(FunctionName='audio-encode', InvocationType='RequestResponse', Payload=json.dumps(inferred_loc))
     return ret
 
 
@@ -119,7 +119,6 @@ def demux():
         encoded = run_encode(inferred_loc)
     
     resp = {'urls': s3.get_presigned_urls(folder), 'status': encoded['StatusCode']}
-    logger.info(resp)
     return resp
 
 
