@@ -65,7 +65,7 @@ export default function AudioWave( {url, id, onReady, wavesurferRef, handleSeek}
 
   
   return (
-    <div style={{ pointerEvents: (id==='original') ? 'auto' : 'none'}}>
+    <div style={{ pointerEvents: (id==='Original') ? 'auto' : 'none'}}>
       <WaveSurfer plugins={plugins} onMount={handleWSMount}>
           <WaveForm {...wfOpts}/>
           <div id="timeline" />

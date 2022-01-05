@@ -3,7 +3,6 @@ FROM python:slim-buster
 ARG DEBIAN_FRONTEND=noninteractive
 ENV TZ=America/New_York
 RUN apt update
-RUN apt install -y ffmpeg
 
 COPY requirements.txt /app/requirements.txt
 WORKDIR /app

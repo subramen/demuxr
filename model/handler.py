@@ -89,7 +89,7 @@ class DemucsHandler(BaseHandler):
 
     def cache(self, stems, s3_folder, fmt=None):
         bucket, folder = s3_folder
-        key = folder + '/inferred.npz'
+        key = folder + '/model_output.npz'
         source_names = ["drums", "bass", "other", "vocals"]
         stems = dict(zip(source_names, stems))
         with io.BytesIO() as buf_:
