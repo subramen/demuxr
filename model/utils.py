@@ -70,18 +70,18 @@ def capture_init(init):
 
 
 
-def load_model(model, model_weights_path, is_quantized):
-    state = torch.load(model_weights_path)
-    if is_quantized:
-        quantizer = DiffQuantizer(model, group_size=8, min_size=1)
-        buf = io.BytesIO(zlib.decompress(state["compressed"]))
-        state = torch.load(buf, "cpu")
-        quantizer.restore_quantized_state(state)
-        quantizer.detach() 
-    else:
-        model.load_state_dict(state)
-    model.eval()
-    return model
+# def load_model(model, model_weights_path, is_quantized=False):
+#     state = torch.load(model_weights_path)
+#     if is_quantized:
+#         quantizer = DiffQuantizer(model, group_size=8, min_size=1)
+#         buf = io.BytesIO(zlib.decompress(state["compressed"]))
+#         state = torch.load(buf, "cpu")
+#         quantizer.restore_quantized_state(state)
+#         quantizer.detach() 
+#     else:
+#         model.load_state_dict(state)
+#     model.eval()
+#     return model
 
 
 def apply_model(model, mix, max_batch_sz=None, overlap=0.25, transition_power=1.):
@@ -107,12 +107,11 @@ def apply_model(model, mix, max_batch_sz=None, overlap=0.25, transition_power=1.
     
 
     def infer(inp, length):
-        with torch.no_grad():
-            with torch.cuda.amp.autocast():
-                x = model(inp)
-                x.detach()
-                if length:
-                    x = center_trim(x, length)
+        with torch.no_grad(), torch.cuda.amp.autocast():
+            x = model(inp)
+            x.detach()
+            if length:
+                x = center_trim(x, length)
         return x
 
 
@@ -127,12 +126,10 @@ def apply_model(model, mix, max_batch_sz=None, overlap=0.25, transition_power=1.
     offsets = range(0, total_length, stride)
     valid_seg_len = model.valid_length(SEG_LEN)
     
-    print('no. of offsets ', len(offsets))
     for offset in offsets:
         seg =  TensorChunk(mix, offset, SEG_LEN).padded(valid_seg_len)
         seg_list.append(seg)
     
-    print('len of seg_list ', len(seg_list))
     model_out = batch_infer(model, seg_list, SEG_LEN, max_batch_sz)
     stems = merge_segments(model_out, offsets)
     return stems

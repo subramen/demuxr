@@ -1,4 +1,4 @@
-FROM node:alpine as build
+FROM node:lts-alpine3.11 as build
 RUN mkdir /app
 COPY . /app
 WORKDIR /app

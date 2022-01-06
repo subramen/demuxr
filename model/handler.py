@@ -2,7 +2,6 @@ import torch
 import torchaudio
 from ts.torch_handler.base_handler import BaseHandler
 from pathlib import Path
-import uuid
 from loguru import logger
 import io
 import boto3
@@ -11,7 +10,7 @@ import numpy as np
 
 # From https://github.com/facebookresearch/demucs/
 from model import Demucs
-from utils import load_model, apply_model
+from utils import apply_model
 
 S3_CLIENT = boto3.client('s3')
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -24,8 +23,15 @@ def read_ogg_from_s3(bucket, key):
     return waveform
 
  
-def read_model(model_weights_path):
-    model = load_model(Demucs([1,1,1,1]), model_weights_path, True)
+def load_model(model_weights_path):
+    if model_weights_path is None:
+        model_weights_url = "https://dl.fbaipublicfiles.com/demucs/v3.0/demucs-e07c671f.th"
+        state = torch.hub.load_state_dict_from_url(model_weights_url, map_location='cpu', check_hash=True)
+    else:
+        state = torch.load(model_weights_path)
+    model = Demucs(['bass', 'drums', 'vocals', 'other'])
+    model.load_state_dict(state)
+    model.eval()
     return model
 
 
@@ -46,7 +52,7 @@ class DemucsHandler(BaseHandler):
         self.manifest = ctx.manifest
         properties = ctx.system_properties
         model_weights_path = Path(properties.get("model_dir")) / Path(self.manifest['model']['serializedFile'])
-        self.model = read_model(model_weights_path).to(DEVICE)
+        self.model = load_model(model_weights_path).to(DEVICE)
 
 
     def read_input(self, data):
@@ -78,6 +84,7 @@ class DemucsHandler(BaseHandler):
 
     # From https://github.com/facebookresearch/demucs/blob/dd7a77a0b2600d24168bbe7a40ef67f195586b62/demucs/separate.py#L207
     def postprocess(self, inference_output):
+        logger.info("Starting postprocess")
         stems = []
         for source in inference_output:
             source = source / max(1.01 * source.abs().max(), 1)  # source.max(dim=1).values.max(dim=-1)
@@ -101,6 +108,7 @@ class DemucsHandler(BaseHandler):
 
 
     def handle(self, data, context):
+        logger.info("Reading input track")
         wav, s3_folder = self.read_input(data)
 
         tic = time.time()

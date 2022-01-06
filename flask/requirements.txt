@@ -2,7 +2,6 @@ flask
 requests
 flask_cors
 youtube_dl
-pathlib
 loguru
 botocore
 boto3

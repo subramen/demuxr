@@ -2,13 +2,12 @@ from flask import Flask, request
 import requests
 from flask_cors import CORS, cross_origin
 import youtube_dl
-from pathlib import Path
+# from pathlib import Path
+import os
 import tempfile
 from loguru import logger
 import s3_helper as s3
-import io
 import json
-import time
 import boto3
 from botocore.config import Config
 
@@ -25,8 +24,8 @@ def get_yt_audio(url):
     """
     downloads the url
     returns path of the audio
-    TODO: return fileobj instead and delete tmp file
     """
+    logger.info("Getting audio from youtube...")
     with tempfile.TemporaryDirectory() as temp:
         ydl_opts = {
             'quiet':True,
@@ -40,7 +39,7 @@ def get_yt_audio(url):
         }
     with youtube_dl.YoutubeDL(ydl_opts) as ydl:
         info_dict = ydl.extract_info(url, download=True)
-    audio_path = Path(temp) / info_dict['id'] / 'original.ogg'
+    audio_path = os.path.join(temp, info_dict['id'], 'original.ogg')
     return audio_path
 
 # movable to frontend/js
@@ -65,6 +64,7 @@ def get_yt_metadata(url):
 # movable to frontend/js
 def run_inference(key):
     """ship audio to model"""
+    logger.info("Starting inference...")
     resp = requests.post(url="http://model:8080/predictions/demucs_quantized/1", json={'Bucket': BUCKET, 'Key': key})
     if resp.status_code != 200:
         raise RuntimeError(f"Torchserve inference failed with HTTP {resp.status_code} | {resp.text}")

@@ -11,6 +11,19 @@ from torch import nn
 
 from utils import capture_init, center_trim
 
+def rescale_conv(conv, reference):
+    std = conv.weight.std().detach()
+    scale = (std / reference)**0.5
+    conv.weight.data /= scale
+    if conv.bias is not None:
+        conv.bias.data /= scale
+
+@torch.jit.export
+def rescale_module(module, reference):
+    for sub in module.modules():
+        if isinstance(sub, (nn.Conv1d, nn.ConvTranspose1d)):
+            rescale_conv(sub, reference)
+
 
 class BLSTM(nn.Module):
     def __init__(self, dim, layers=1):
@@ -24,20 +37,6 @@ class BLSTM(nn.Module):
         x = self.linear(x)
         x = x.permute(1, 2, 0)
         return x
-
-
-def rescale_conv(conv, reference):
-    std = conv.weight.std().detach()
-    scale = (std / reference)**0.5
-    conv.weight.data /= scale
-    if conv.bias is not None:
-        conv.bias.data /= scale
-
-@torch.jit.export
-def rescale_module(module, reference):
-    for sub in module.modules():
-        if isinstance(sub, (nn.Conv1d, nn.ConvTranspose1d)):
-            rescale_conv(sub, reference)
 
 
 class Demucs(nn.Module):

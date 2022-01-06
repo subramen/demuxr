@@ -1,22 +1,21 @@
 FROM pytorch/torchserve:latest-gpu
 
-RUN pip3 install --upgrade pip && \
-    pip3 --no-cache-dir install --upgrade awscli 
-
 USER root
+RUN pip3 install --upgrade pip
+RUN pip3 install --upgrade awscli 
 RUN apt-get update -y && apt-get install -y ffmpeg
-
 USER model-server
+
 COPY . /home/model-server/
 WORKDIR /home/model-server/
 
-RUN aws s3 cp s3://demucs-app-modelstore/demucs_quantized-07afea75.th ./
+RUN aws s3 cp s3://demucs-app-modelstore/demucs-e07c671f.th ./
 
 RUN torch-model-archiver \
 --model-name demucs_quantized \
 --version 1 \
 --handler handler.py \
---serialized-file demucs_quantized-07afea75.th \
+--serialized-file demucs-e07c671f.th \
 --export-path ./model-store \
 -r requirements.txt \
 --extra-files utils.py,model.py
