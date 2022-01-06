@@ -4,6 +4,7 @@ ARG DEBIAN_FRONTEND=noninteractive
 ENV TZ=America/New_York
 RUN pip3 install --upgrade pip
 RUN apt update
+RUN apt install -y ffmpeg
 
 COPY requirements.txt /app/requirements.txt
 WORKDIR /app

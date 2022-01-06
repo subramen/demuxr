@@ -15,72 +15,44 @@ const Button = styled(MuiButton)(spacing)
 const server_endpoint = "/flask/file_upload"
 
 function App () {
-  // const [sessId, setSessId] = useState(0)
-  // const [videoTitle, setVideoTitle] = useState("")
   const [outputUrls, setOutputUrls] = useState("")
-  
-  // App states:
-  const [isStart, setIsStart] = useState(false)
   const [demuxRunning, setDemuxRunning] = useState(false)
   const [demuxComplete, setDemuxComplete] = useState(false)
 
+
   const resetStates = useCallback(() => {
-    // console.log('resetting from ', isStart, demuxRunning, demuxComplete)
-    setIsStart(false)
     setDemuxRunning(false)
     setDemuxComplete(false)
-    // setSessId(Date.now())
-    // console.log(sessId)
   })
+
+
+  const fetchInference = useCallback((server_endpoint, data) => {
+    return fetch(server_endpoint, data, 120000).then(response => response.json())
+  })
+
 
   function runInference(data) {
     if (data['file'] !== null) {
       resetStates() 
-      fetch(server_endpoint, { method: 'POST', body: data })
-      .then(response => {
-        if (response.status === 200) {
-          setOutputUrls(response.stem_urls)
-          setDemuxRunning(false)
-          setDemuxComplete(true)
-        } else {
-          throw new Error('Inference failed, HTTP:', response.status)
-        }
-      })
+      setDemuxRunning(true)
+
+      fetchInference(server_endpoint, { method: 'POST', body: data })
+        .then(response => {
+          console.log(response)
+          if (response.status === 200) {
+            setOutputUrls(response.stem_urls)
+            setDemuxRunning(false)
+            setDemuxComplete(true)
+          } else {
+            throw new Error('Inference failed, HTTP:', response.status)
+          }
+        })
+        .catch(error => {
+          console.error(error)
+          resetStates()
+        })
     }
   }
-
-
-  // function runDemuxr (url) {
-  //   setIsStart(true)
-
-  //   fetchVideoInfo(url)
-  //     .then(data => {
-  //       // console.log(data)
-  //       // setVideoTitle(data.title)
-  //       // setS3Url(data.s3_url)
-  //       return data.video_id
-  //     })
-  //     .then((id) => {
-  //       setIsStart(false)
-  //       setDemuxRunning(true)
-  //       console.log(id)
-  //       return fetchInference(url, id)
-  //     })
-  //     .then(response => {
-  //       console.log(response)
-  //       if (response.status === 200) {
-  //         setOutputUrls(response.stem_urls)
-  //         setDemuxRunning(false)
-  //         setDemuxComplete(true)
-  //       } else {
-  //         throw new Error('Inference failed, HTTP:', response.status)
-  //       }
-  //     })
-  //     .catch(error => {
-  //       console.error(error)
-  //       resetStates()
-  //     })
-  // }
 
   return (
     <div className='App'>
@@ -88,14 +60,10 @@ function App () {
         
         <UserInput
           runInference={runInference}
-          // videoTitle={videoTitle}
-          isStart={isStart}
           demuxRunning={demuxRunning}
           demuxComplete={demuxComplete}
           resetStates={resetStates}/>
         
-
-        {/* <Player key={sessId} urls={outputUrls} demuxRunning={demuxRunning} demuxComplete={demuxComplete} /> */}
         <Player urls={outputUrls} demuxRunning={demuxRunning} demuxComplete={demuxComplete} />
 
         <footer className="footer">
@@ -108,7 +76,7 @@ function App () {
   )
 }
 
-function UserInput ({ runInference, isStart, demuxRunning, demuxComplete, resetStates }) {
+function UserInput ({ runInference, demuxRunning, demuxComplete, resetStates }) {
   const fileRef = useRef()
 
   const handleSubmit = (e) => {
@@ -128,19 +96,16 @@ function UserInput ({ runInference, isStart, demuxRunning, demuxComplete, resetS
       <div className="btn-go">
         <Button onClick={handleSubmit} px="45px" variant="contained" color="primary">Go</Button>
       </div>
-      <Status isStart={isStart} demuxRunning={demuxRunning} demuxComplete={demuxComplete} />
+      <Status demuxRunning={demuxRunning} demuxComplete={demuxComplete} />
     </div>
   )
 }
 
 
-function Status ({ isStart, demuxRunning, demuxComplete}) {
+function Status ({ demuxRunning, demuxComplete}) {
   let elt = null
-  if (isStart) {
+  if (demuxRunning) {
     elt = <LinearProgress color="secondary" variant="indeterminate" />
-  } else if (demuxRunning) {
-    // const msg = 'Running demuxr ' + (videoTitle ? 'on ' + videoTitle : '')
-    elt = <Typography color="secondary"> Running demuxr </Typography>
   } else if (demuxComplete) {
     elt = <Typography color="secondary">Ready to play!</Typography>
   }
@@ -163,7 +128,6 @@ function Player ({ urls, demuxRunning, demuxComplete }) {
   useEffect(() => {
     return () => Object.values(stemRefs).map(ref => {
       if (ref.current) {
-        // console.log('destroying')
         ref.current.stop()
         ref.current.destroy()
         setPlayEnabled(false)
@@ -173,7 +137,7 @@ function Player ({ urls, demuxRunning, demuxComplete }) {
 
   const handleReady = () => {
     readyCountRef.current += 1
-    if (readyCountRef.current >= stemRefs.length) setPlayEnabled(true)
+    if (readyCountRef.current >= Object.keys(stemRefs).length) setPlayEnabled(true)
   }
 
   const handlePlayPause = () => {

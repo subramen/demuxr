@@ -13,8 +13,6 @@ services:
 
   flask:
     build: ./flask
-    ports:
-      - "5000:5000"
     depends_on:
       - model
     container_name: flask
