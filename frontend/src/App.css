@@ -12,11 +12,11 @@ html, body {
  
 .wrapper {
     display: grid;
-    gap: 20px;
-    grid-template-columns: repeat(12, [col-start] 1fr);
+    gap: 50px;
+    grid-template-columns: repeat(12, [col-start] 1fr); /* sets number and widths for cols */
 }
 
-.wrapper > * {
+.wrapper > * { 
     grid-column: col-start / span 12;
 }
 
@@ -55,7 +55,6 @@ html, body {
         display: grid;
         grid-area: search-bar;
         align-self: center;
-        height: 50px; 
         background-color: #444444;
         color: white;
         border-radius: 12px;

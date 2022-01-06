@@ -1,126 +1,82 @@
 from flask import Flask, request
 import requests
-from flask_cors import CORS, cross_origin
-import youtube_dl
-# from pathlib import Path
-import os
-import tempfile
+from flask_cors import CORS
 from loguru import logger
-import s3_helper as s3
+import logging
 import json
+import hashlib
 import boto3
 from botocore.config import Config
+from botocore.exceptions import ClientError
 
 app = Flask(__name__)
-cors = CORS(app)
-torchserve_url = "http://model:8080/"
-pred_endpoint = "predictions/demucs_quantized/1"
+CORS(app)
+logging.getLogger('flask_cors').level = logging.DEBUG
+
 BUCKET = "demucs-app-cache"
-
 lambda_client = boto3.client('lambda', region_name='us-east-1', config=Config(read_timeout=180))
+s3_client = boto3.client('s3')
 
 
-def get_yt_audio(url):
-    """
-    downloads the url
-    returns path of the audio
-    """
-    logger.info("Getting audio from youtube...")
-    with tempfile.TemporaryDirectory() as temp:
-        ydl_opts = {
-            'quiet':True,
-            'outtmpl':f'{temp}/%(id)s/original.%(ext)s',
-            'format': 'bestaudio/best',
-            'postprocessors': [{
-                'key': 'FFmpegExtractAudio',
-                'preferredcodec': 'vorbis',
-                'preferredquality': '128',}],
-                'postprocessor_args': ['-ar', '44100'],
-        }
-    with youtube_dl.YoutubeDL(ydl_opts) as ydl:
-        info_dict = ydl.extract_info(url, download=True)
-    audio_path = os.path.join(temp, info_dict['id'], 'original.ogg')
-    return audio_path
+@app.route("/file_upload", methods=['POST'])
+def file_upload():
+    # Receive audio file
+    file = request.files['file']
+    file_hash = hashlib.md5(file.read()).hexdigest()
+    
+    # Check cache 
+    if not s3_exists(file_hash + '/vocals.ogg'):
+        # Upload audio file to S3 cache
+        file.seek(0)
+        s3_client.upload_fileobj(file, BUCKET, file_hash + '/original.ogg')
+        # Run inference on uploaded audio
+        run_inference(file_hash + '/original.ogg')
+        # Encode inferenced npz output
+        encode_resp = run_encode(BUCKET, file_hash + '/model_output.npz')
+        
+    return {'stem_urls': s3_presigned_urls(file_hash), 'status': encode_resp['StatusCode']}
 
-# movable to frontend/js
-def get_yt_metadata(url):
-    """
-        response = {
-        'url': url,
-        'title': info_dict['title'],
-        'id': info_dict['id'],
-        # 'folder': s3.get_url(info_dict['id']),
-        # 'status': 200
-    }"""
-    metadata = {}
-    with youtube_dl.YoutubeDL({}) as ydl:
-        info_dict = ydl.extract_info(url, download=False)
-        metadata['url'] = url
-        metadata['title'] = info_dict.get('title', '')
-        metadata['video_id'] = info_dict.get('id')
-        metadata['s3_url'] = s3.get_url(info_dict.get('id'))
-    return metadata
 
-# movable to frontend/js
+
+def s3_exists(obj):
+    try:
+        s3_client.head_object(Bucket=BUCKET, Key=obj)
+    except ClientError:
+        logger.info(f"{obj} not found in cache")
+        return False
+    logger.info(f"{obj} found in cache")
+    return True
+
+
+def s3_presigned_urls(folder):
+    out_dict = {}
+    for obj in ['bass', 'drums', 'vocals', 'other', 'original']:
+        out_dict[obj] = s3_client.generate_presigned_url(
+            ClientMethod='get_object', 
+            Params={
+                'Bucket': BUCKET, 
+                'Key': folder + '/' + obj + '.ogg'}, 
+            ExpiresIn=60)
+    return out_dict
+
+
 def run_inference(key):
     """ship audio to model"""
-    logger.info("Starting inference...")
+    logger.info("Running inference on ", key)
     resp = requests.post(url="http://model:8080/predictions/demucs_quantized/1", json={'Bucket': BUCKET, 'Key': key})
     if resp.status_code != 200:
         raise RuntimeError(f"Torchserve inference failed with HTTP {resp.status_code} | {resp.text}")
 
 
-def run_encode(inferred_loc):
+def run_encode(bucket, obj):
     """
     aws --debug --cli-read-timeout 0  lambda invoke --function-name test --payload '{"bucket": "demucs-app-cache", "object": "test/inferred.npz"}' out.json
     """
+    payload = json.dumps({"bucket": bucket, "object": obj})
     logger.info("Invoking encode function on Lambda")
-    ret  = lambda_client.invoke(FunctionName='audio-encode', InvocationType='RequestResponse', Payload=json.dumps(inferred_loc))
+    ret  = lambda_client.invoke(FunctionName='audio-encode', InvocationType='RequestResponse', Payload=payload)
     return ret
 
 
-@app.route("/api/info")
-@cross_origin()
-def info():
-    url = request.args.get('url')
-    return get_yt_metadata(url)
-
-@app.route("/api/demux")
-@cross_origin()
-def demux():
-    url = request.args.get('url')
-    folder = request.args.get('folder')
-    logger.info(f"Received request of url {url} and folder {folder}")
-
-    is_input_cached = lambda folder: s3.grep(folder + '/original.ogg')
-    is_inferred = lambda folder: s3.grep(folder + '/inferred.npz')
-    is_encoded = lambda folder: s3.grep(folder + '/vocals.ogg')
-    get_inferred_loc = lambda folder: {"bucket": BUCKET, "object": f"{folder}/inferred.npz"}
-    
-    if is_encoded(folder):
-       return {'urls': s3.get_presigned_urls(folder), 'status': 200}
-
-    if is_inferred(folder):
-        inferred_loc = get_inferred_loc(folder)
-        encoded = run_encode(inferred_loc)
-    
-    elif is_input_cached(folder):
-        key = f'{folder}/original.ogg'
-        run_inference(key)
-        inferred_loc = get_inferred_loc(folder)
-        encoded = run_encode(inferred_loc)
-    
-    else:
-        audio_path = get_yt_audio(url)
-        s3.upload_stem(audio_path) 
-        key = f'{folder}/original.ogg'
-        run_inference(key)
-        inferred_loc = get_inferred_loc(folder)
-        encoded = run_encode(inferred_loc)
-    
-    resp = {'urls': s3.get_presigned_urls(folder), 'status': encoded['StatusCode']}
-    return resp
-
-
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    app.run(host="0.0.0.0", port=6786)

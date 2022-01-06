@@ -1,7 +1,6 @@
 flask
 requests
 flask_cors
-youtube_dl
 loguru
 botocore
 boto3
