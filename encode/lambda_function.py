@@ -1,37 +1,50 @@
 import json
 import os
 import io, boto3, subprocess, numpy as np
+import time
 
+s3 = boto3.client("s3")
 
-def encode(bucket, folder, object_name, fmt='ogg'):
-    s3 = boto3.client("s3")
+def encode(bucket, object_name, out_fmt='ogg'):
     blob = io.BytesIO()
-    s3.download_fileobj(bucket, folder + "/" + object_name, blob)
+    tic = time.time()
+    s3.download_fileobj(bucket, object_name, blob)
     blob.seek(0)
+    print("Blob download: ", time.time()-tic)
+    
+    tic = time.time()
     npz = np.load(blob)
     del blob
+    print("Blob load: ", time.time()-tic)
 
-    cmd = f"./sox --multi-threaded -t s16 -r 44100 -c 2 - -t {fmt} -r 44100 -b 16 -c 2 -"
+    cmd = f"/opt/bin/sox --multi-threaded -t s16 -r 44100 -c 2 - -t {out_fmt} -r 44100 -b 16 -c 2 -"
     cmd_a = cmd.split(' ')
-    
     source_names = ["drums", "bass", "other", "vocals"]
+    folder = object_name.split("/")[0]
+    
     for name in source_names:
+        key = folder + '/' + name + '.' + out_fmt
         array = npz[name]
+        tic = time.time()
         handle = subprocess.Popen(cmd_a, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         out, err = handle.communicate(array.tobytes(order='F'))
         buf = io.BytesIO(out)
-        key = folder + '/' + name + '.' + fmt
+        print(name, " encode: ", time.time()-tic)
+        
+        print("Uploading ", name, " to ", bucket, "/", key)
+        tic = time.time()
         s3.upload_fileobj(buf, bucket, key)
-
-
+        print(name, " upload: ", time.time()-tic)
+    
+    return True
+        
+        
+        
 def lambda_handler(event, context):
-    encode(event['bucket'], event['folder'], event['object'])
+    is_done = False
+    is_done = encode(event['bucket'], event['object'])
     
     return {
         'statusCode': 200,
-        'body': json.dumps('Track encoded to OGG!')
+        'isDone': is_done
     }
-
-
-if __name__ == "__main__":
-    encode('demucs-app-cache', 'test', 'inferred_tensor.bin')
