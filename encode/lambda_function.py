@@ -17,7 +17,8 @@ def encode(bucket, object_name, out_fmt='ogg'):
     del blob
     print("Blob load: ", time.time()-tic)
 
-    cmd = f"/opt/bin/sox --multi-threaded -t s16 -r 44100 -c 2 - -t {out_fmt} -r 44100 -b 16 -c 2 -"
+    samplerate = int(npz['samplerate'])
+    cmd = f"/opt/bin/sox --multi-threaded -t s16 -r {samplerate} -c 2 - -t {out_fmt} -r 44100 -b 16 -c 2 -"
     cmd_a = cmd.split(' ')
     source_names = ["drums", "bass", "other", "vocals"]
     folder = object_name.split("/")[0]
