@@ -19,8 +19,8 @@ torchaudio.utils.sox_utils.set_buffer_size(8192 * 20)
 
 def read_ogg_from_s3(bucket, key):
     response = S3_CLIENT.get_object(Bucket=bucket, Key=key)
-    waveform, sample_rate = torchaudio.load(response['Body'], format='ogg')
-    return waveform
+    waveform, samplerate = torchaudio.load(response['Body'], format='ogg')
+    return waveform, samplerate
 
  
 def load_model(model_weights_path):
@@ -58,9 +58,9 @@ class DemucsHandler(BaseHandler):
     def read_input(self, data):
         inp = data[0].get('data') or data[0].get('body') 
         s3_folder = (inp['Bucket'], inp['Key'].split('/')[0])
-        wav = read_ogg_from_s3(inp['Bucket'], inp['Key'])
+        wav, samplerate = read_ogg_from_s3(inp['Bucket'], inp['Key'])
         wav = wav.to(DEVICE)
-        return wav, s3_folder
+        return wav, s3_folder, samplerate
         
 
     def preprocess(self, wav):
@@ -94,11 +94,12 @@ class DemucsHandler(BaseHandler):
         return stems
 
 
-    def cache(self, stems, s3_folder, fmt=None):
+    def cache(self, stems, s3_folder, samplerate, fmt=None):
         bucket, folder = s3_folder
         key = folder + '/model_output.npz'
         source_names = ["drums", "bass", "other", "vocals"]
         stems = dict(zip(source_names, stems))
+        stems['samplerate'] = samplerate
         with io.BytesIO() as buf_:
             np.savez_compressed(buf_, **stems)
             buf_.seek(0)
@@ -109,7 +110,7 @@ class DemucsHandler(BaseHandler):
 
     def handle(self, data, context):
         logger.info("Reading input track")
-        wav, s3_folder = self.read_input(data)
+        wav, s3_folder, samplerate = self.read_input(data)
 
         tic = time.time()
         wav, ref = self.preprocess(wav)
@@ -124,7 +125,7 @@ class DemucsHandler(BaseHandler):
         logger.info(f'postprocess took {time.time()-tic}')
     
         tic = time.time()
-        key = self.cache(stems, s3_folder)
+        key = self.cache(stems, s3_folder, samplerate)
         logger.info(f'caching took {time.time()-tic}')
 
         result = {"bucket": s3_folder[0], "folder": s3_folder[1], "object": key}
